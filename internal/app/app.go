@@ -25,7 +25,10 @@ type App struct {
 func New(cfg config.Config) *App {
 	logger := appLog.New()
 	st := store.New()
-	aof := persistence.NewAOF(cfg.AppendOnly, cfg.AOFPath)
+	aof, err := persistence.NewAOF(cfg.AppendOnly, cfg.AOFPath, cfg.AOFFsync)
+	if err != nil {
+		logger.Fatalf("invalid AOF config: %v", err)
+	}
 	registry := command.NewDefaultRegistry()
 
 	return &App{
@@ -43,9 +46,11 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel()
 
 	janitorDone := a.store.StartJanitor(runCtx, time.Minute)
+	aofSyncerDone := a.aof.StartSyncer(runCtx, time.Second)
 	defer func() {
 		cancel()
 		<-janitorDone
+		<-aofSyncerDone
 		if err := a.aof.Close(); err != nil {
 			a.logger.Printf("aof close error: %v", err)
 		}

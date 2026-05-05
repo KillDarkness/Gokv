@@ -4,7 +4,7 @@ Gokv is a lightweight Redis-like in-memory key-value database written in Go.
 
 Redis-compatible enough to be useful. Small enough to understand. Fast enough to be fun.
 
-Current version: `0.2.0`
+Current version: `0.2.1`
 
 ## Goal
 
@@ -46,10 +46,11 @@ The Compose setup enables AOF persistence and stores data in the `gokv-data` Doc
 AOF persistence can be enabled with environment variables:
 
 ```sh
-GOKV_APPENDONLY=true GOKV_AOF_PATH=data/appendonly.aof go run ./cmd/gokv
+GOKV_APPENDONLY=true GOKV_AOF_PATH=data/appendonly.aof GOKV_AOF_FSYNC=everysec go run ./cmd/gokv
 ```
 
 When AOF is enabled, write commands are appended to `appendonly.aof` and replayed on startup.
+Supported fsync policies are `always`, `everysec` and `no`.
 
 ## Supported Commands
 

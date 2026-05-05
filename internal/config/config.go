@@ -12,6 +12,7 @@ type Config struct {
 	Databases  int
 	AppendOnly bool
 	AOFPath    string
+	AOFFsync   string
 	Snapshot   bool
 }
 
@@ -22,6 +23,7 @@ func Default() Config {
 		Databases:  1,
 		AppendOnly: false,
 		AOFPath:    "data/appendonly.aof",
+		AOFFsync:   "always",
 		Snapshot:   false,
 	}
 }
@@ -48,6 +50,9 @@ func Load() (Config, error) {
 	}
 	if value := os.Getenv("GOKV_AOF_PATH"); value != "" {
 		cfg.AOFPath = value
+	}
+	if value := os.Getenv("GOKV_AOF_FSYNC"); value != "" {
+		cfg.AOFFsync = value
 	}
 
 	return cfg, nil

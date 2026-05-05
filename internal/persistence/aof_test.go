@@ -12,7 +12,10 @@ import (
 
 func TestAOFReplayRestoresWrittenCommands(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "appendonly.aof")
-	aof := NewAOF(true, path)
+	aof, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
 	ctx := context.Background()
 
 	if err := aof.Append(ctx, []string{"SET", "name", "kill"}); err != nil {
@@ -30,7 +33,10 @@ func TestAOFReplayRestoresWrittenCommands(t *testing.T) {
 
 	registry := command.NewDefaultRegistry()
 	st := store.New()
-	replayAOF := NewAOF(true, path)
+	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
 
 	if err := replayAOF.Replay(ctx, func(ctx context.Context, args []string) protocol.Reply {
 		return registry.Dispatch(ctx, st, nil, args)
@@ -43,5 +49,11 @@ func TestAOFReplayRestoresWrittenCommands(t *testing.T) {
 	}
 	if _, ok := st.Get("lang"); ok {
 		t.Fatal("Get(lang) found deleted key after replay")
+	}
+}
+
+func TestNewAOFRejectsInvalidFsyncPolicy(t *testing.T) {
+	if _, err := NewAOF(true, filepath.Join(t.TempDir(), "appendonly.aof"), "sometimes"); err == nil {
+		t.Fatal("NewAOF() error = nil; want error")
 	}
 }
