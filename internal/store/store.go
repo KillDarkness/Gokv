@@ -108,6 +108,30 @@ func (s *Store) Delete(keys ...string) int64 {
 	return deleted
 }
 
+func (s *Store) FlushDB() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.data = make(map[string]Entry)
+}
+
+func (s *Store) Size() int {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for key, entry := range s.data {
+		if entryExpired(entry, now) {
+			delete(s.data, key)
+			continue
+		}
+		count++
+	}
+	return count
+}
+
 func (s *Store) Exists(keys ...string) int64 {
 	now := time.Now().UnixNano()
 

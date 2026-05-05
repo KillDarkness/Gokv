@@ -12,6 +12,7 @@ func registerKeyCommands(registry *Registry) {
 	registry.Register(Command{Name: "EXISTS", Arity: -2, ReadOnly: true, Handler: existsCommand})
 	registry.Register(Command{Name: "EXPIRE", Arity: 3, Handler: expireCommand})
 	registry.Register(Command{Name: "TTL", Arity: 2, ReadOnly: true, Handler: ttlCommand})
+	registry.Register(Command{Name: "FLUSHDB", Arity: 1, Handler: flushDBCommand})
 }
 
 func delCommand(ctx *Context) protocol.Reply {
@@ -42,4 +43,9 @@ func ttlCommand(ctx *Context) protocol.Reply {
 		return protocol.Integer(-1)
 	}
 	return protocol.Integer(int64(ttl / time.Second))
+}
+
+func flushDBCommand(ctx *Context) protocol.Reply {
+	ctx.Store.FlushDB()
+	return protocol.SimpleString("OK")
 }

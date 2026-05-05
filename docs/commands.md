@@ -13,8 +13,5 @@ Supported in the initial implementation:
 - `DECR key`
 - `MSET key value [key value ...]`
 - `MGET key [key ...]`
-
-Planned commands:
-
 - `FLUSHDB`
 - `INFO`

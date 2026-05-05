@@ -20,11 +20,12 @@ type Command struct {
 }
 
 type Registry struct {
-	commands map[string]Command
+	commands  map[string]Command
+	startedAt time.Time
 }
 
 func NewRegistry() *Registry {
-	return &Registry{commands: make(map[string]Command)}
+	return &Registry{commands: make(map[string]Command), startedAt: time.Now()}
 }
 
 func NewDefaultRegistry() *Registry {
@@ -54,7 +55,7 @@ func (r *Registry) Dispatch(ctx context.Context, st *store.Store, appender Appen
 		return protocol.Error(fmt.Sprintf("wrong number of arguments for '%s' command", strings.ToLower(cmd.Name)))
 	}
 
-	commandCtx := &Context{Context: ctx, Store: st, Appender: appender, Args: args, StartedAt: time.Now()}
+	commandCtx := &Context{Context: ctx, Store: st, Appender: appender, Args: args, StartedAt: r.startedAt}
 	reply := cmd.Handler(commandCtx)
 	if cmd.ReadOnly || appender == nil {
 		return reply

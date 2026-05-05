@@ -84,3 +84,17 @@ func TestStoreMSetMGet(t *testing.T) {
 		t.Fatalf("MGet(lang) = %#v; want go", got[2])
 	}
 }
+
+func TestStoreFlushDBAndSize(t *testing.T) {
+	st := New()
+	st.Set("name", "kill")
+	st.Set("lang", "go")
+
+	if got := st.Size(); got != 2 {
+		t.Fatalf("Size() = %d; want 2", got)
+	}
+	st.FlushDB()
+	if got := st.Size(); got != 0 {
+		t.Fatalf("Size() = %d; want 0", got)
+	}
+}
