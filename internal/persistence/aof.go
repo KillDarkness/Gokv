@@ -276,7 +276,7 @@ func writeSnapshotAsAOF(file *os.File, snapshot map[string]store.SnapshotEntry) 
 
 func writeDatabasesAsAOF(file *os.File, stores []*store.Store) error {
 	for db, st := range stores {
-		if err := writeDatabaseSnapshotAsAOF(file, db, st.Snapshot()); err != nil {
+		if err := writeDatabaseAsAOF(file, db, st.Rules(), st.Snapshot()); err != nil {
 			return err
 		}
 	}
@@ -284,11 +284,20 @@ func writeDatabasesAsAOF(file *os.File, stores []*store.Store) error {
 }
 
 func writeDatabaseSnapshotAsAOF(file *os.File, db int, snapshot map[string]store.SnapshotEntry) error {
-	if len(snapshot) == 0 {
+	return writeDatabaseAsAOF(file, db, nil, snapshot)
+}
+
+func writeDatabaseAsAOF(file *os.File, db int, rules []store.Rule, snapshot map[string]store.SnapshotEntry) error {
+	if len(snapshot) == 0 && len(rules) == 0 {
 		return nil
 	}
 	if err := protocol.WriteCommand(file, []string{"SELECT", fmt.Sprintf("%d", db)}); err != nil {
 		return err
+	}
+	for _, rule := range rules {
+		if err := protocol.WriteCommand(file, []string{"RULE", "SET", rule.Prefix, "ttl", fmt.Sprintf("%d", int64(rule.TTL/time.Second))}); err != nil {
+			return err
+		}
 	}
 	now := time.Now().UnixNano()
 	keys := make([]string, 0, len(snapshot))

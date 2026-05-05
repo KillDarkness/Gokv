@@ -2,6 +2,7 @@ package store
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -9,6 +10,7 @@ import (
 type Store struct {
 	mu             sync.RWMutex
 	data           map[string]Entry
+	rules          map[string]Rule
 	keyCount       int
 	maxKeys        int
 	evictionPolicy EvictionPolicy
@@ -26,7 +28,7 @@ func NewWithOptions(opts Options) *Store {
 	if !policy.Valid() {
 		policy = NoEviction
 	}
-	return &Store{data: make(map[string]Entry), maxKeys: opts.MaxKeys, evictionPolicy: policy}
+	return &Store{data: make(map[string]Entry), rules: make(map[string]Rule), maxKeys: opts.MaxKeys, evictionPolicy: policy}
 }
 
 func (s *Store) Set(key string, value string) error {
@@ -38,7 +40,7 @@ func (s *Store) Set(key string, value string) error {
 		return err
 	}
 
-	s.setEntryLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now})
+	s.setEntryLocked(key, s.applyRulesLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now}, now))
 	return nil
 }
 
@@ -57,7 +59,7 @@ func (s *Store) MSet(values map[string]string) error {
 	}
 
 	for key, value := range values {
-		s.setEntryLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now})
+		s.setEntryLocked(key, s.applyRulesLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now}, now))
 	}
 	return nil
 }
@@ -291,7 +293,7 @@ func (s *Store) Increment(key string, delta int64) (int64, error) {
 		if ok {
 			s.deleteEntryLocked(key)
 		}
-		s.setEntryLocked(key, Entry{Type: TypeString, Value: strconv.FormatInt(value, 10), LastAccess: now})
+		s.setEntryLocked(key, s.applyRulesLocked(key, Entry{Type: TypeString, Value: strconv.FormatInt(value, 10), LastAccess: now}, now))
 		return value, nil
 	}
 	if entry.Type != TypeString {
@@ -309,6 +311,7 @@ func (s *Store) Increment(key string, delta int64) (int64, error) {
 	value += delta
 	entry.Value = strconv.FormatInt(value, 10)
 	entry.LastAccess = now
+	entry = s.applyRulesLocked(key, entry, now)
 	s.setEntryLocked(key, entry)
 
 	return value, nil
@@ -329,4 +332,19 @@ func (s *Store) deleteEntryLocked(key string) {
 	if s.keyCount > 0 {
 		s.keyCount--
 	}
+}
+
+func (s *Store) applyRulesLocked(key string, entry Entry, now int64) Entry {
+	var matched Rule
+	found := false
+	for prefix, rule := range s.rules {
+		if strings.HasPrefix(key, prefix) && (!found || len(prefix) > len(matched.Prefix)) {
+			matched = rule
+			found = true
+		}
+	}
+	if found && matched.TTL > 0 {
+		entry.ExpiresAt = now + matched.TTL.Nanoseconds()
+	}
+	return entry
 }

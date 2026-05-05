@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestStoreSetGetDeleteExists(t *testing.T) {
 	st := New()
@@ -122,6 +125,23 @@ func TestStoreSnapshotAndRestore(t *testing.T) {
 
 	if got, ok := restored.Get("name"); !ok || got != "kill" {
 		t.Fatalf("Get() = %q, %v; want kill, true", got, ok)
+	}
+}
+
+func TestStoreRuleAppliesTTLByPrefix(t *testing.T) {
+	st := New()
+	st.SetRule("session:", time.Minute)
+	if err := st.Set("session:abc", "token"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if ttl, exists, hasTTL := st.TTL("session:abc"); !exists || !hasTTL || ttl <= 0 {
+		t.Fatalf("TTL() = %v, %v, %v; want positive, true, true", ttl, exists, hasTTL)
+	}
+	if err := st.Set("plain", "value"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if _, exists, hasTTL := st.TTL("plain"); !exists || hasTTL {
+		t.Fatalf("TTL(plain) exists = %v, hasTTL = %v; want true, false", exists, hasTTL)
 	}
 }
 

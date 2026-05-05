@@ -38,6 +38,7 @@ func NewDefaultRegistry(m *metrics.Metrics) *Registry {
 	registerServerCommands(registry)
 	registerStringCommands(registry)
 	registerKeyCommands(registry)
+	registerRuleCommands(registry)
 	return registry
 }
 

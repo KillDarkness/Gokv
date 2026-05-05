@@ -20,6 +20,8 @@ func TestRegistryDispatchStringCommands(t *testing.T) {
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"DECR", "counter"}), ":0\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"MSET", "a", "1", "b", "2"}), "+OK\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"MGET", "a", "missing", "b"}), "*3\r\n$1\r\n1\r\n$-1\r\n$1\r\n2\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"RULE", "SET", "session:", "ttl", "60"}), "+OK\r\n")
+	assertReplyContains(t, registry.Dispatch(context.Background(), st, nil, []string{"RULE", "LIST"}), "session:")
 	assertReplyContains(t, registry.Dispatch(context.Background(), st, nil, []string{"INFO"}), "gokv_version:")
 	assertReplyContains(t, registry.Dispatch(context.Background(), st, nil, []string{"INFO"}), "total_commands_processed:")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"EXISTS", "name"}), ":1\r\n")

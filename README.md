@@ -77,11 +77,15 @@ When both AOF and snapshot are enabled, AOF is used as the recovery source.
 - `FLUSHDB`
 - `INFO`
 - `SELECT index`
+- `RULE SET prefix ttl seconds`
+- `RULE DEL prefix`
+- `RULE LIST`
 
 `INFO` exposes basic server, client, command and keyspace metrics.
 
 Eviction can be enabled with `GOKV_MAXKEYS` and `GOKV_EVICTION`. Supported policies are `noeviction`, `allkeys-random`, `volatile-random`, `allkeys-lru` and `volatile-lru`.
 Multiple logical databases can be enabled with `GOKV_DATABASES` and selected with `SELECT`.
+Rules can apply automatic TTLs by prefix, for example `RULE SET session: ttl 1800` makes future `session:*` writes expire automatically.
 
 ## Development
 

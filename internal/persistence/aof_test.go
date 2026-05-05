@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/KillDarkness/gokv/internal/command"
 	"github.com/KillDarkness/gokv/internal/protocol"
@@ -151,6 +152,42 @@ func TestAOFRewritePersistsMultipleDatabases(t *testing.T) {
 	}
 	if got, ok := restored[1].Get("name"); !ok || got != "db1" {
 		t.Fatalf("db1 Get(name) = %q, %v; want db1, true", got, ok)
+	}
+}
+
+func TestAOFRewritePersistsRules(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "appendonly.aof")
+	aof, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	db := store.New()
+	db.SetRule("session:", time.Minute)
+
+	if err := aof.RewriteDatabases(context.Background(), []*store.Store{db}); err != nil {
+		t.Fatalf("RewriteDatabases() error = %v", err)
+	}
+
+	registry := command.NewDefaultRegistry(nil)
+	restored := store.New()
+	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	if err := replayAOF.Replay(context.Background(), func(ctx context.Context, args []string) protocol.Reply {
+		if len(args) == 2 && strings.EqualFold(args[0], "SELECT") {
+			return protocol.SimpleString("OK")
+		}
+		return registry.Dispatch(ctx, restored, nil, args)
+	}); err != nil {
+		t.Fatalf("Replay() error = %v", err)
+	}
+
+	if err := restored.Set("session:abc", "token"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if ttl, exists, hasTTL := restored.TTL("session:abc"); !exists || !hasTTL || ttl <= 0 {
+		t.Fatalf("TTL() = %v, %v, %v; want positive, true, true", ttl, exists, hasTTL)
 	}
 }
 

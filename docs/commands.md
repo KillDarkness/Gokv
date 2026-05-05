@@ -155,3 +155,33 @@ For one-shot `redis-cli` commands, use `-n`:
 redis-cli -p 6379 -n 1 SET name db1
 redis-cli -p 6379 -n 1 GET name
 ```
+
+## RULE
+
+Manages automatic key rules for the selected database. The first supported rule type is prefix TTL.
+
+```sh
+redis-cli -p 6379 RULE SET session: ttl 1800
+# OK
+
+redis-cli -p 6379 SET session:abc token
+# OK
+
+redis-cli -p 6379 TTL session:abc
+# 1800
+```
+
+List rules:
+
+```sh
+redis-cli -p 6379 RULE LIST
+```
+
+Delete a rule:
+
+```sh
+redis-cli -p 6379 RULE DEL session:
+# 1
+```
+
+When multiple rules match, the longest prefix wins.
