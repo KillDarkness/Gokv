@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 )
 
 var ErrInvalidRESP = errors.New("invalid RESP command")
+
+var inlinePingCommand = []string{"PING"}
 
 type Parser struct {
 	reader *bufio.Reader
@@ -49,8 +50,8 @@ func (p *Parser) readArray() ([]string, error) {
 		return nil, fmt.Errorf("%w: empty array", ErrInvalidRESP)
 	}
 
-	args := make([]string, 0, count)
-	for range count {
+	args := make([]string, count)
+	for i := range count {
 		prefix, err := p.reader.ReadByte()
 		if err != nil {
 			return nil, err
@@ -74,7 +75,7 @@ func (p *Parser) readArray() ([]string, error) {
 		if buf[length] != '\r' || buf[length+1] != '\n' {
 			return nil, fmt.Errorf("%w: malformed bulk string", ErrInvalidRESP)
 		}
-		args = append(args, string(buf[:length]))
+		args[i] = string(buf[:length])
 	}
 
 	return args, nil
@@ -85,6 +86,9 @@ func (p *Parser) readInline() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if line == "PING" {
+		return inlinePingCommand, nil
+	}
 	args := strings.Fields(line)
 	if len(args) == 0 {
 		return nil, fmt.Errorf("%w: empty inline command", ErrInvalidRESP)
@@ -93,15 +97,32 @@ func (p *Parser) readInline() ([]string, error) {
 }
 
 func (p *Parser) readNumberLine() (int, error) {
-	line, err := p.readLine()
+	line, err := p.reader.ReadSlice('\n')
 	if err != nil {
 		return 0, err
 	}
-	number, err := strconv.Atoi(line)
-	if err != nil {
+	if len(line) < 2 || line[len(line)-2] != '\r' {
+		return 0, fmt.Errorf("%w: missing CRLF", ErrInvalidRESP)
+	}
+	number, ok := parsePositiveInt(line[:len(line)-2])
+	if !ok {
 		return 0, fmt.Errorf("%w: invalid integer", ErrInvalidRESP)
 	}
 	return number, nil
+}
+
+func parsePositiveInt(data []byte) (int, bool) {
+	if len(data) == 0 {
+		return 0, false
+	}
+	value := 0
+	for _, b := range data {
+		if b < '0' || b > '9' {
+			return 0, false
+		}
+		value = value*10 + int(b-'0')
+	}
+	return value, true
 }
 
 func (p *Parser) readLine() (string, error) {
