@@ -20,6 +20,7 @@ type App struct {
 	server   *server.Server
 	store    *store.Store
 	aof      *persistence.AOF
+	snapshot *persistence.Snapshot
 }
 
 func New(cfg config.Config) *App {
@@ -29,6 +30,7 @@ func New(cfg config.Config) *App {
 	if err != nil {
 		logger.Fatalf("invalid AOF config: %v", err)
 	}
+	snapshot := persistence.NewSnapshot(cfg.Snapshot, cfg.SnapshotPath)
 	registry := command.NewDefaultRegistry()
 
 	return &App{
@@ -37,6 +39,7 @@ func New(cfg config.Config) *App {
 		registry: registry,
 		store:    st,
 		aof:      aof,
+		snapshot: snapshot,
 		server:   server.New(cfg, registry, st, aof, logger),
 	}
 }
@@ -51,6 +54,9 @@ func (a *App) Run(ctx context.Context) error {
 		cancel()
 		<-janitorDone
 		<-aofSyncerDone
+		if err := a.snapshot.Save(context.Background(), a.store); err != nil {
+			a.logger.Printf("snapshot save error: %v", err)
+		}
 		if err := a.aof.Close(); err != nil {
 			a.logger.Printf("aof close error: %v", err)
 		}
@@ -60,6 +66,11 @@ func (a *App) Run(ctx context.Context) error {
 		if err := a.aof.Replay(runCtx, func(ctx context.Context, args []string) protocol.Reply {
 			return a.registry.Dispatch(ctx, a.store, nil, args)
 		}); err != nil {
+			return err
+		}
+	} else if a.cfg.Snapshot {
+		a.logger.Printf("loading snapshot from %s", a.cfg.SnapshotPath)
+		if err := a.snapshot.Load(runCtx, a.store); err != nil {
 			return err
 		}
 	}

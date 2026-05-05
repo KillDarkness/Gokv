@@ -98,3 +98,15 @@ func TestStoreFlushDBAndSize(t *testing.T) {
 		t.Fatalf("Size() = %d; want 0", got)
 	}
 }
+
+func TestStoreSnapshotAndRestore(t *testing.T) {
+	st := New()
+	st.Set("name", "kill")
+
+	restored := New()
+	restored.Restore(st.Snapshot())
+
+	if got, ok := restored.Get("name"); !ok || got != "kill" {
+		t.Fatalf("Get() = %q, %v; want kill, true", got, ok)
+	}
+}

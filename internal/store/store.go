@@ -132,6 +132,46 @@ func (s *Store) Size() int {
 	return count
 }
 
+func (s *Store) Snapshot() map[string]SnapshotEntry {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	snapshot := make(map[string]SnapshotEntry, len(s.data))
+	for key, entry := range s.data {
+		if entryExpired(entry, now) {
+			delete(s.data, key)
+			continue
+		}
+		if entry.Type != TypeString {
+			continue
+		}
+		value, ok := entry.Value.(string)
+		if !ok {
+			continue
+		}
+		snapshot[key] = SnapshotEntry{Type: entry.Type, Value: value, ExpiresAt: entry.ExpiresAt, LastAccess: entry.LastAccess}
+	}
+	return snapshot
+}
+
+func (s *Store) Restore(snapshot map[string]SnapshotEntry) {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.data = make(map[string]Entry, len(snapshot))
+	for key, entry := range snapshot {
+		storeEntry := Entry{Type: entry.Type, Value: entry.Value, ExpiresAt: entry.ExpiresAt, LastAccess: entry.LastAccess}
+		if entryExpired(storeEntry, now) {
+			continue
+		}
+		s.data[key] = storeEntry
+	}
+}
+
 func (s *Store) Exists(keys ...string) int64 {
 	now := time.Now().UnixNano()
 

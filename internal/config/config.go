@@ -7,24 +7,26 @@ import (
 )
 
 type Config struct {
-	Host       string
-	Port       int
-	Databases  int
-	AppendOnly bool
-	AOFPath    string
-	AOFFsync   string
-	Snapshot   bool
+	Host         string
+	Port         int
+	Databases    int
+	AppendOnly   bool
+	AOFPath      string
+	AOFFsync     string
+	Snapshot     bool
+	SnapshotPath string
 }
 
 func Default() Config {
 	return Config{
-		Host:       "0.0.0.0",
-		Port:       6379,
-		Databases:  1,
-		AppendOnly: false,
-		AOFPath:    "data/appendonly.aof",
-		AOFFsync:   "always",
-		Snapshot:   false,
+		Host:         "0.0.0.0",
+		Port:         6379,
+		Databases:    1,
+		AppendOnly:   false,
+		AOFPath:      "data/appendonly.aof",
+		AOFFsync:     "always",
+		Snapshot:     false,
+		SnapshotPath: "data/dump.gokv",
 	}
 }
 
@@ -53,6 +55,16 @@ func Load() (Config, error) {
 	}
 	if value := os.Getenv("GOKV_AOF_FSYNC"); value != "" {
 		cfg.AOFFsync = value
+	}
+	if value := os.Getenv("GOKV_SNAPSHOT"); value != "" {
+		snapshot, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid GOKV_SNAPSHOT: %w", err)
+		}
+		cfg.Snapshot = snapshot
+	}
+	if value := os.Getenv("GOKV_SNAPSHOT_PATH"); value != "" {
+		cfg.SnapshotPath = value
 	}
 
 	return cfg, nil
