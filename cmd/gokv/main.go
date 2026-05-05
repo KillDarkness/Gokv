@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"os/signal"
 	"syscall"
 
@@ -13,7 +14,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	application := app.New(config.Default())
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("invalid config: %v", err)
+	}
+
+	application := app.New(cfg)
 	if err := application.Run(ctx); err != nil {
 		application.Logger().Fatalf("gokv stopped: %v", err)
 	}

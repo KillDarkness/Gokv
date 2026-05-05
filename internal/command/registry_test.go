@@ -13,12 +13,12 @@ func TestRegistryDispatchStringCommands(t *testing.T) {
 	registry := NewDefaultRegistry()
 	st := store.New()
 
-	assertReply(t, registry.Dispatch(context.Background(), st, []string{"PING"}), "+PONG\r\n")
-	assertReply(t, registry.Dispatch(context.Background(), st, []string{"SET", "name", "kill"}), "+OK\r\n")
-	assertReply(t, registry.Dispatch(context.Background(), st, []string{"GET", "name"}), "$4\r\nkill\r\n")
-	assertReply(t, registry.Dispatch(context.Background(), st, []string{"EXISTS", "name"}), ":1\r\n")
-	assertReply(t, registry.Dispatch(context.Background(), st, []string{"DEL", "name"}), ":1\r\n")
-	assertReply(t, registry.Dispatch(context.Background(), st, []string{"GET", "name"}), "$-1\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"PING"}), "+PONG\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"SET", "name", "kill"}), "+OK\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"GET", "name"}), "$4\r\nkill\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"EXISTS", "name"}), ":1\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"DEL", "name"}), ":1\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"GET", "name"}), "$-1\r\n")
 }
 
 func assertReply(t *testing.T, reply protocol.Reply, want string) {

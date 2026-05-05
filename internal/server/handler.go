@@ -21,7 +21,7 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 			return
 		}
 
-		reply := s.registry.Dispatch(ctx, s.store, args)
+		reply := s.registry.Dispatch(ctx, s.store, s.appender, args)
 		if err := protocol.WriteReply(writer, reply); err != nil {
 			return
 		}

@@ -15,11 +15,12 @@ type Server struct {
 	cfg      config.Config
 	registry *command.Registry
 	store    *store.Store
+	appender command.Appender
 	logger   *appLog.Logger
 }
 
-func New(cfg config.Config, registry *command.Registry, st *store.Store, logger *appLog.Logger) *Server {
-	return &Server{cfg: cfg, registry: registry, store: st, logger: logger}
+func New(cfg config.Config, registry *command.Registry, st *store.Store, appender command.Appender, logger *appLog.Logger) *Server {
+	return &Server{cfg: cfg, registry: registry, store: st, appender: appender, logger: logger}
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {

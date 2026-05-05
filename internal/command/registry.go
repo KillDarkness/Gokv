@@ -40,7 +40,7 @@ func (r *Registry) Register(cmd Command) {
 	r.commands[cmd.Name] = cmd
 }
 
-func (r *Registry) Dispatch(ctx context.Context, st *store.Store, args []string) protocol.Reply {
+func (r *Registry) Dispatch(ctx context.Context, st *store.Store, appender Appender, args []string) protocol.Reply {
 	if len(args) == 0 {
 		return protocol.Error("empty command")
 	}
@@ -54,7 +54,18 @@ func (r *Registry) Dispatch(ctx context.Context, st *store.Store, args []string)
 		return protocol.Error(fmt.Sprintf("wrong number of arguments for '%s' command", strings.ToLower(cmd.Name)))
 	}
 
-	return cmd.Handler(&Context{Context: ctx, Store: st, Args: args, StartedAt: time.Now()})
+	commandCtx := &Context{Context: ctx, Store: st, Appender: appender, Args: args, StartedAt: time.Now()}
+	reply := cmd.Handler(commandCtx)
+	if cmd.ReadOnly || appender == nil {
+		return reply
+	}
+	if _, ok := reply.(protocol.Error); ok {
+		return reply
+	}
+	if err := appender.Append(ctx, args); err != nil {
+		return protocol.Error(fmt.Sprintf("could not persist command: %v", err))
+	}
+	return reply
 }
 
 func validArity(arity int, got int) bool {

@@ -10,6 +10,7 @@ coverage.out
 # Runtime data
 appendonly.aof
 dump.gokv
+data/
 
 # Editor and OS files
 .DS_Store

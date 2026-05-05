@@ -1,12 +1,17 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strconv"
+)
 
 type Config struct {
 	Host       string
 	Port       int
 	Databases  int
 	AppendOnly bool
+	AOFPath    string
 	Snapshot   bool
 }
 
@@ -16,8 +21,36 @@ func Default() Config {
 		Port:       6379,
 		Databases:  1,
 		AppendOnly: false,
+		AOFPath:    "data/appendonly.aof",
 		Snapshot:   false,
 	}
+}
+
+func Load() (Config, error) {
+	cfg := Default()
+
+	if value := os.Getenv("GOKV_HOST"); value != "" {
+		cfg.Host = value
+	}
+	if value := os.Getenv("GOKV_PORT"); value != "" {
+		port, err := strconv.Atoi(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid GOKV_PORT: %w", err)
+		}
+		cfg.Port = port
+	}
+	if value := os.Getenv("GOKV_APPENDONLY"); value != "" {
+		appendOnly, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid GOKV_APPENDONLY: %w", err)
+		}
+		cfg.AppendOnly = appendOnly
+	}
+	if value := os.Getenv("GOKV_AOF_PATH"); value != "" {
+		cfg.AOFPath = value
+	}
+
+	return cfg, nil
 }
 
 func (c Config) Addr() string {
