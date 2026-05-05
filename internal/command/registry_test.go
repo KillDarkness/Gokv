@@ -10,7 +10,7 @@ import (
 )
 
 func TestRegistryDispatchStringCommands(t *testing.T) {
-	registry := NewDefaultRegistry()
+	registry := NewDefaultRegistry(nil)
 	st := store.New()
 
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"PING"}), "+PONG\r\n")
@@ -21,6 +21,7 @@ func TestRegistryDispatchStringCommands(t *testing.T) {
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"MSET", "a", "1", "b", "2"}), "+OK\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"MGET", "a", "missing", "b"}), "*3\r\n$1\r\n1\r\n$-1\r\n$1\r\n2\r\n")
 	assertReplyContains(t, registry.Dispatch(context.Background(), st, nil, []string{"INFO"}), "gokv_version:")
+	assertReplyContains(t, registry.Dispatch(context.Background(), st, nil, []string{"INFO"}), "total_commands_processed:")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"EXISTS", "name"}), ":1\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"TTL", "name"}), ":-1\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"EXPIRE", "name", "10"}), ":1\r\n")

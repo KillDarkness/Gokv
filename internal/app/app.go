@@ -7,6 +7,7 @@ import (
 	"github.com/KillDarkness/gokv/internal/command"
 	"github.com/KillDarkness/gokv/internal/config"
 	appLog "github.com/KillDarkness/gokv/internal/log"
+	"github.com/KillDarkness/gokv/internal/metrics"
 	"github.com/KillDarkness/gokv/internal/persistence"
 	"github.com/KillDarkness/gokv/internal/protocol"
 	"github.com/KillDarkness/gokv/internal/server"
@@ -21,17 +22,19 @@ type App struct {
 	store    *store.Store
 	aof      *persistence.AOF
 	snapshot *persistence.Snapshot
+	metrics  *metrics.Metrics
 }
 
 func New(cfg config.Config) *App {
 	logger := appLog.New()
 	st := store.New()
+	metrics := metrics.New()
 	aof, err := persistence.NewAOF(cfg.AppendOnly, cfg.AOFPath, cfg.AOFFsync)
 	if err != nil {
 		logger.Fatalf("invalid AOF config: %v", err)
 	}
 	snapshot := persistence.NewSnapshot(cfg.Snapshot, cfg.SnapshotPath)
-	registry := command.NewDefaultRegistry()
+	registry := command.NewDefaultRegistry(metrics)
 
 	return &App{
 		cfg:      cfg,
@@ -40,7 +43,8 @@ func New(cfg config.Config) *App {
 		store:    st,
 		aof:      aof,
 		snapshot: snapshot,
-		server:   server.New(cfg, registry, st, aof, logger),
+		metrics:  metrics,
+		server:   server.New(cfg, registry, st, aof, metrics, logger),
 	}
 }
 

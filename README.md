@@ -4,7 +4,7 @@ Gokv is a lightweight Redis-like in-memory key-value database written in Go.
 
 Redis-compatible enough to be useful. Small enough to understand. Fast enough to be fun.
 
-Current version: `0.2.7`
+Current version: `0.2.8`
 
 ## Goal
 
@@ -76,6 +76,8 @@ When both AOF and snapshot are enabled, AOF is used as the recovery source.
 - `MGET key [key ...]`
 - `FLUSHDB`
 - `INFO`
+
+`INFO` exposes basic server, client, command and keyspace metrics.
 
 ## Development
 

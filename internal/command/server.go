@@ -25,6 +25,6 @@ func pingCommand(ctx *Context) protocol.Reply {
 
 func infoCommand(ctx *Context) protocol.Reply {
 	uptime := int64(time.Since(ctx.StartedAt).Seconds())
-	info := fmt.Sprintf("# Server\r\ngokv_version:%s\r\nuptime_in_seconds:%d\r\n\r\n# Keyspace\r\ndb0:keys=%d\r\n", version.Version, uptime, ctx.Store.Size())
+	info := fmt.Sprintf("# Server\r\ngokv_version:%s\r\nuptime_in_seconds:%d\r\n\r\n# Clients\r\nconnected_clients:%d\r\ntotal_connections_received:%d\r\n\r\n# Stats\r\ntotal_commands_processed:%d\r\ntotal_errors:%d\r\n\r\n# Keyspace\r\ndb0:keys=%d\r\n", version.Version, uptime, ctx.Metrics.ActiveConnections(), ctx.Metrics.TotalConnections(), ctx.Metrics.Commands(), ctx.Metrics.Errors(), ctx.Store.Size())
 	return protocol.BulkString{Value: info}
 }

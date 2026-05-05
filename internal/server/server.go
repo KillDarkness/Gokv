@@ -8,6 +8,7 @@ import (
 	"github.com/KillDarkness/gokv/internal/command"
 	"github.com/KillDarkness/gokv/internal/config"
 	appLog "github.com/KillDarkness/gokv/internal/log"
+	"github.com/KillDarkness/gokv/internal/metrics"
 	"github.com/KillDarkness/gokv/internal/store"
 )
 
@@ -16,11 +17,12 @@ type Server struct {
 	registry *command.Registry
 	store    *store.Store
 	appender command.Appender
+	metrics  *metrics.Metrics
 	logger   *appLog.Logger
 }
 
-func New(cfg config.Config, registry *command.Registry, st *store.Store, appender command.Appender, logger *appLog.Logger) *Server {
-	return &Server{cfg: cfg, registry: registry, store: st, appender: appender, logger: logger}
+func New(cfg config.Config, registry *command.Registry, st *store.Store, appender command.Appender, metrics *metrics.Metrics, logger *appLog.Logger) *Server {
+	return &Server{cfg: cfg, registry: registry, store: st, appender: appender, metrics: metrics, logger: logger}
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {

@@ -31,7 +31,7 @@ func TestAOFReplayRestoresWrittenCommands(t *testing.T) {
 		t.Fatalf("Close() error = %v", err)
 	}
 
-	registry := command.NewDefaultRegistry()
+	registry := command.NewDefaultRegistry(nil)
 	st := store.New()
 	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
 	if err != nil {
@@ -79,7 +79,7 @@ func TestAOFRewriteCompactsCurrentState(t *testing.T) {
 		t.Fatalf("Rewrite() error = %v", err)
 	}
 
-	registry := command.NewDefaultRegistry()
+	registry := command.NewDefaultRegistry(nil)
 	restored := store.New()
 	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
 	if err != nil {
