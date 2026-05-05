@@ -49,3 +49,19 @@ func TestStoreExpireAndTTL(t *testing.T) {
 		t.Fatal("Get() found expired key")
 	}
 }
+
+func TestStoreIncrement(t *testing.T) {
+	st := New()
+
+	if got, err := st.Increment("counter", 1); err != nil || got != 1 {
+		t.Fatalf("Increment() = %d, %v; want 1, nil", got, err)
+	}
+	if got, err := st.Increment("counter", -1); err != nil || got != 0 {
+		t.Fatalf("Increment() = %d, %v; want 0, nil", got, err)
+	}
+
+	st.Set("bad", "not-number")
+	if _, err := st.Increment("bad", 1); err == nil {
+		t.Fatal("Increment() error = nil; want error")
+	}
+}

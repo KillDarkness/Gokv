@@ -9,11 +9,11 @@ Supported in the initial implementation:
 - `EXISTS key [key ...]`
 - `EXPIRE key seconds`
 - `TTL key`
+- `INCR key`
+- `DECR key`
 
 Planned commands:
 
-- `INCR`
-- `DECR`
 - `MSET`
 - `MGET`
 - `FLUSHDB`

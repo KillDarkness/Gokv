@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strconv"
 	"sync"
 	"time"
 )
@@ -84,4 +85,36 @@ func (s *Store) Exists(keys ...string) int64 {
 		count++
 	}
 	return count
+}
+
+func (s *Store) Increment(key string, delta int64) (int64, error) {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entry, ok := s.data[key]
+	if !ok || entryExpired(entry, now) {
+		value := delta
+		s.data[key] = Entry{Type: TypeString, Value: strconv.FormatInt(value, 10), LastAccess: now}
+		return value, nil
+	}
+	if entry.Type != TypeString {
+		return 0, strconv.ErrSyntax
+	}
+
+	current, ok := entry.Value.(string)
+	if !ok {
+		return 0, strconv.ErrSyntax
+	}
+	value, err := strconv.ParseInt(current, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	value += delta
+	entry.Value = strconv.FormatInt(value, 10)
+	entry.LastAccess = now
+	s.data[key] = entry
+
+	return value, nil
 }
