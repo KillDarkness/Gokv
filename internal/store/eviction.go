@@ -31,6 +31,10 @@ func (p EvictionPolicy) Valid() bool {
 	}
 }
 
+func (p EvictionPolicy) TracksAccess() bool {
+	return p == AllKeysLRU || p == VolatileLRU
+}
+
 func (s *Store) evictForWriteLocked(keys []string, now int64) error {
 	if s.maxKeys <= 0 {
 		return nil

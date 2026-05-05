@@ -64,6 +64,26 @@ func (s *Store) MSet(values map[string]string) error {
 
 func (s *Store) Get(key string) (string, bool) {
 	now := time.Now().UnixNano()
+	if !s.evictionPolicy.TracksAccess() {
+		s.mu.RLock()
+		entry, ok := s.data[key]
+		if !ok {
+			s.mu.RUnlock()
+			return "", false
+		}
+		if entryExpired(entry, now) {
+			s.mu.RUnlock()
+			s.deleteExpiredKeys([]string{key}, now)
+			return "", false
+		}
+		if entry.Type != TypeString {
+			s.mu.RUnlock()
+			return "", false
+		}
+		value, ok := entry.Value.(string)
+		s.mu.RUnlock()
+		return value, ok
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -92,6 +112,34 @@ func (s *Store) Get(key string) (string, bool) {
 
 func (s *Store) MGet(keys ...string) []StringResult {
 	now := time.Now().UnixNano()
+	if !s.evictionPolicy.TracksAccess() {
+		s.mu.RLock()
+		results := make([]StringResult, 0, len(keys))
+		expired := make([]string, 0)
+		for _, key := range keys {
+			entry, ok := s.data[key]
+			if !ok {
+				results = append(results, StringResult{})
+				continue
+			}
+			if entryExpired(entry, now) {
+				expired = append(expired, key)
+				results = append(results, StringResult{})
+				continue
+			}
+			value, ok := entry.Value.(string)
+			if entry.Type != TypeString || !ok {
+				results = append(results, StringResult{})
+				continue
+			}
+			results = append(results, StringResult{Value: value, OK: true})
+		}
+		s.mu.RUnlock()
+		if len(expired) > 0 {
+			s.deleteExpiredKeys(expired, now)
+		}
+		return results
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
