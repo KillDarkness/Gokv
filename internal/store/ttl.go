@@ -31,21 +31,25 @@ func (s *Store) Expire(key string, ttl time.Duration) bool {
 func (s *Store) TTL(key string) (time.Duration, bool, bool) {
 	now := time.Now().UnixNano()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
 
 	entry, ok := s.data[key]
 	if !ok {
+		s.mu.RUnlock()
 		return 0, false, false
 	}
 	if entryExpired(entry, now) {
-		s.deleteEntryLocked(key)
+		s.mu.RUnlock()
+		s.deleteExpiredKeys([]string{key}, now)
 		return 0, false, false
 	}
 	if entry.ExpiresAt == 0 {
+		s.mu.RUnlock()
 		return 0, true, false
 	}
-	return time.Duration(entry.ExpiresAt - now), true, true
+	ttl := time.Duration(entry.ExpiresAt - now)
+	s.mu.RUnlock()
+	return ttl, true, true
 }
 
 func (s *Store) StartJanitor(ctx context.Context, interval time.Duration) <-chan struct{} {

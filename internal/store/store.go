@@ -153,13 +153,12 @@ func (s *Store) Size() int {
 func (s *Store) Snapshot() map[string]SnapshotEntry {
 	now := time.Now().UnixNano()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	snapshot := make(map[string]SnapshotEntry, len(s.data))
 	for key, entry := range s.data {
 		if entryExpired(entry, now) {
-			s.deleteEntryLocked(key)
 			continue
 		}
 		if entry.Type != TypeString {
@@ -194,8 +193,8 @@ func (s *Store) Restore(snapshot map[string]SnapshotEntry) {
 func (s *Store) Exists(keys ...string) int64 {
 	now := time.Now().UnixNano()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	expired := make([]string, 0)
 
 	var count int64
 	for _, key := range keys {
@@ -204,12 +203,29 @@ func (s *Store) Exists(keys ...string) int64 {
 			continue
 		}
 		if entryExpired(entry, now) {
-			s.deleteEntryLocked(key)
+			expired = append(expired, key)
 			continue
 		}
 		count++
 	}
+	s.mu.RUnlock()
+
+	if len(expired) > 0 {
+		s.deleteExpiredKeys(expired, now)
+	}
 	return count
+}
+
+func (s *Store) deleteExpiredKeys(keys []string, now int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, key := range keys {
+		entry, ok := s.data[key]
+		if ok && entryExpired(entry, now) {
+			s.deleteEntryLocked(key)
+		}
+	}
 }
 
 func (s *Store) Increment(key string, delta int64) (int64, error) {

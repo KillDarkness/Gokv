@@ -32,3 +32,30 @@ func BenchmarkStoreSetGet(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkStoreExists(b *testing.B) {
+	st := New()
+	for i := range 100_000 {
+		if err := st.Set(fmt.Sprintf("key:%d", i), "value"); err != nil {
+			b.Fatal(err)
+		}
+	}
+	keys := []string{"key:1", "key:50000", "missing"}
+
+	b.ResetTimer()
+	for b.Loop() {
+		_ = st.Exists(keys...)
+	}
+}
+
+func BenchmarkStoreTTLNoExpiration(b *testing.B) {
+	st := New()
+	if err := st.Set("key", "value"); err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		_, _, _ = st.TTL("key")
+	}
+}
