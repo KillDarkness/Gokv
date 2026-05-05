@@ -11,10 +11,10 @@ Supported in the initial implementation:
 - `TTL key`
 - `INCR key`
 - `DECR key`
+- `MSET key value [key value ...]`
+- `MGET key [key ...]`
 
 Planned commands:
 
-- `MSET`
-- `MGET`
 - `FLUSHDB`
 - `INFO`

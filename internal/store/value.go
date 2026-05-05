@@ -8,3 +8,8 @@ const (
 	TypeHash
 	TypeSet
 )
+
+type StringResult struct {
+	Value string
+	OK    bool
+}

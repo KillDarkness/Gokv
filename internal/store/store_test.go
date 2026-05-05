@@ -65,3 +65,22 @@ func TestStoreIncrement(t *testing.T) {
 		t.Fatal("Increment() error = nil; want error")
 	}
 }
+
+func TestStoreMSetMGet(t *testing.T) {
+	st := New()
+	st.MSet(map[string]string{"name": "kill", "lang": "go"})
+
+	got := st.MGet("name", "missing", "lang")
+	if len(got) != 3 {
+		t.Fatalf("MGet() length = %d; want 3", len(got))
+	}
+	if !got[0].OK || got[0].Value != "kill" {
+		t.Fatalf("MGet(name) = %#v; want kill", got[0])
+	}
+	if got[1].OK {
+		t.Fatalf("MGet(missing) = %#v; want missing", got[1])
+	}
+	if !got[2].OK || got[2].Value != "go" {
+		t.Fatalf("MGet(lang) = %#v; want go", got[2])
+	}
+}

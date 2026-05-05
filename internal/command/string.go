@@ -5,6 +5,8 @@ import "github.com/KillDarkness/gokv/internal/protocol"
 func registerStringCommands(registry *Registry) {
 	registry.Register(Command{Name: "SET", Arity: 3, Handler: setCommand})
 	registry.Register(Command{Name: "GET", Arity: 2, ReadOnly: true, Handler: getCommand})
+	registry.Register(Command{Name: "MSET", Arity: -3, Handler: msetCommand})
+	registry.Register(Command{Name: "MGET", Arity: -2, ReadOnly: true, Handler: mgetCommand})
 	registry.Register(Command{Name: "INCR", Arity: 2, Handler: incrCommand})
 	registry.Register(Command{Name: "DECR", Arity: 2, Handler: decrCommand})
 }
@@ -20,6 +22,32 @@ func getCommand(ctx *Context) protocol.Reply {
 		return protocol.NullBulkString{}
 	}
 	return protocol.BulkString{Value: value}
+}
+
+func msetCommand(ctx *Context) protocol.Reply {
+	if len(ctx.Args)%2 == 0 {
+		return protocol.Error("wrong number of arguments for 'mset' command")
+	}
+
+	values := make(map[string]string, (len(ctx.Args)-1)/2)
+	for i := 1; i < len(ctx.Args); i += 2 {
+		values[ctx.Args[i]] = ctx.Args[i+1]
+	}
+	ctx.Store.MSet(values)
+	return protocol.SimpleString("OK")
+}
+
+func mgetCommand(ctx *Context) protocol.Reply {
+	results := ctx.Store.MGet(ctx.Args[1:]...)
+	replies := make(protocol.Array, 0, len(results))
+	for _, result := range results {
+		if !result.OK {
+			replies = append(replies, protocol.NullBulkString{})
+			continue
+		}
+		replies = append(replies, protocol.BulkString{Value: result.Value})
+	}
+	return replies
 }
 
 func incrCommand(ctx *Context) protocol.Reply {

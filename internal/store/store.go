@@ -24,6 +24,17 @@ func (s *Store) Set(key string, value string) {
 	s.data[key] = Entry{Type: TypeString, Value: value, LastAccess: now}
 }
 
+func (s *Store) MSet(values map[string]string) {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for key, value := range values {
+		s.data[key] = Entry{Type: TypeString, Value: value, LastAccess: now}
+	}
+}
+
 func (s *Store) Get(key string) (string, bool) {
 	now := time.Now().UnixNano()
 
@@ -50,6 +61,37 @@ func (s *Store) Get(key string) (string, bool) {
 	s.data[key] = entry
 
 	return value, true
+}
+
+func (s *Store) MGet(keys ...string) []StringResult {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	results := make([]StringResult, 0, len(keys))
+	for _, key := range keys {
+		entry, ok := s.data[key]
+		if !ok {
+			results = append(results, StringResult{})
+			continue
+		}
+		if entryExpired(entry, now) {
+			delete(s.data, key)
+			results = append(results, StringResult{})
+			continue
+		}
+		value, ok := entry.Value.(string)
+		if entry.Type != TypeString || !ok {
+			results = append(results, StringResult{})
+			continue
+		}
+		entry.LastAccess = now
+		s.data[key] = entry
+		results = append(results, StringResult{Value: value, OK: true})
+	}
+
+	return results
 }
 
 func (s *Store) Delete(keys ...string) int64 {
