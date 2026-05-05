@@ -19,6 +19,10 @@ func NewParser(r io.Reader) *Parser {
 	return &Parser{reader: bufio.NewReader(r)}
 }
 
+func (p *Parser) Buffered() int {
+	return p.reader.Buffered()
+}
+
 func (p *Parser) ReadCommand() ([]string, error) {
 	prefix, err := p.reader.ReadByte()
 	if err != nil {

@@ -35,8 +35,10 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 			if err := protocol.WriteReply(bufferedWriter, reply); err != nil {
 				return
 			}
-			if err := bufferedWriter.Flush(); err != nil {
-				return
+			if parser.Buffered() == 0 && bufferedWriter.Buffered() > 0 {
+				if err := bufferedWriter.Flush(); err != nil {
+					return
+				}
 			}
 			continue
 		}
@@ -46,8 +48,10 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 		if err := protocol.WriteReply(bufferedWriter, reply); err != nil {
 			return
 		}
-		if err := bufferedWriter.Flush(); err != nil {
-			return
+		if parser.Buffered() == 0 && bufferedWriter.Buffered() > 0 {
+			if err := bufferedWriter.Flush(); err != nil {
+				return
+			}
 		}
 	}
 }
