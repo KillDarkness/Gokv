@@ -72,6 +72,9 @@ When both AOF and snapshot are enabled, AOF is used as the recovery source.
 - `TTL key`
 - `INCR key`
 - `DECR key`
+- `CAS key expected value`
+- `SETNXEX key value seconds`
+- `GETSETEX key value seconds`
 - `MSET key value [key value ...]`
 - `MGET key [key ...]`
 - `FLUSHDB`

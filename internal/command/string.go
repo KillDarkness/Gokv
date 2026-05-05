@@ -1,6 +1,11 @@
 package command
 
-import "github.com/KillDarkness/gokv/internal/protocol"
+import (
+	"strconv"
+	"time"
+
+	"github.com/KillDarkness/gokv/internal/protocol"
+)
 
 func registerStringCommands(registry *Registry) {
 	registry.Register(Command{Name: "SET", Arity: 3, Handler: setCommand})
@@ -9,6 +14,9 @@ func registerStringCommands(registry *Registry) {
 	registry.Register(Command{Name: "MGET", Arity: -2, ReadOnly: true, Handler: mgetCommand})
 	registry.Register(Command{Name: "INCR", Arity: 2, Handler: incrCommand})
 	registry.Register(Command{Name: "DECR", Arity: 2, Handler: decrCommand})
+	registry.Register(Command{Name: "CAS", Arity: 4, Handler: casCommand})
+	registry.Register(Command{Name: "SETNXEX", Arity: 4, Handler: setNXEXCommand})
+	registry.Register(Command{Name: "GETSETEX", Arity: 4, Handler: getSetEXCommand})
 }
 
 func setCommand(ctx *Context) protocol.Reply {
@@ -68,4 +76,53 @@ func incrementCommand(ctx *Context, delta int64) protocol.Reply {
 		return protocol.Error("value is not an integer or out of range")
 	}
 	return protocol.Integer(value)
+}
+
+func casCommand(ctx *Context) protocol.Reply {
+	swapped, err := ctx.Store.CompareAndSet(ctx.Args[1], ctx.Args[2], ctx.Args[3])
+	if err != nil {
+		return protocol.Error(err.Error())
+	}
+	if swapped {
+		return protocol.Integer(1)
+	}
+	return protocol.Integer(0)
+}
+
+func setNXEXCommand(ctx *Context) protocol.Reply {
+	ttl, ok := parsePositiveSeconds(ctx.Args[3])
+	if !ok {
+		return protocol.Error("ttl must be a positive integer")
+	}
+	set, err := ctx.Store.SetNXEX(ctx.Args[1], ctx.Args[2], ttl)
+	if err != nil {
+		return protocol.Error(err.Error())
+	}
+	if set {
+		return protocol.Integer(1)
+	}
+	return protocol.Integer(0)
+}
+
+func getSetEXCommand(ctx *Context) protocol.Reply {
+	ttl, ok := parsePositiveSeconds(ctx.Args[3])
+	if !ok {
+		return protocol.Error("ttl must be a positive integer")
+	}
+	oldValue, found, err := ctx.Store.GetSetEX(ctx.Args[1], ctx.Args[2], ttl)
+	if err != nil {
+		return protocol.Error(err.Error())
+	}
+	if !found {
+		return protocol.NullBulkString{}
+	}
+	return protocol.BulkString{Value: oldValue}
+}
+
+func parsePositiveSeconds(value string) (time.Duration, bool) {
+	seconds, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || seconds <= 0 {
+		return 0, false
+	}
+	return time.Duration(seconds) * time.Second, true
 }

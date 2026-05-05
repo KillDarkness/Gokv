@@ -96,6 +96,68 @@ func TestStoreMSetMGet(t *testing.T) {
 	}
 }
 
+func TestStoreCompareAndSet(t *testing.T) {
+	st := New()
+	if err := st.Set("name", "old"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	swapped, err := st.CompareAndSet("name", "wrong", "new")
+	if err != nil {
+		t.Fatalf("CompareAndSet() error = %v", err)
+	}
+	if swapped {
+		t.Fatal("CompareAndSet() = true; want false")
+	}
+	if got, ok := st.Get("name"); !ok || got != "old" {
+		t.Fatalf("Get() = %q, %v; want old, true", got, ok)
+	}
+
+	swapped, err = st.CompareAndSet("name", "old", "new")
+	if err != nil {
+		t.Fatalf("CompareAndSet() error = %v", err)
+	}
+	if !swapped {
+		t.Fatal("CompareAndSet() = false; want true")
+	}
+	if got, ok := st.Get("name"); !ok || got != "new" {
+		t.Fatalf("Get() = %q, %v; want new, true", got, ok)
+	}
+}
+
+func TestStoreSetNXEXAndGetSetEX(t *testing.T) {
+	st := New()
+	set, err := st.SetNXEX("session", "one", time.Minute)
+	if err != nil {
+		t.Fatalf("SetNXEX() error = %v", err)
+	}
+	if !set {
+		t.Fatal("SetNXEX() = false; want true")
+	}
+	if ttl, exists, hasTTL := st.TTL("session"); !exists || !hasTTL || ttl <= 0 {
+		t.Fatalf("TTL() = %v, %v, %v; want positive, true, true", ttl, exists, hasTTL)
+	}
+
+	set, err = st.SetNXEX("session", "two", time.Minute)
+	if err != nil {
+		t.Fatalf("SetNXEX() error = %v", err)
+	}
+	if set {
+		t.Fatal("SetNXEX(existing) = true; want false")
+	}
+
+	oldValue, found, err := st.GetSetEX("session", "two", time.Minute)
+	if err != nil {
+		t.Fatalf("GetSetEX() error = %v", err)
+	}
+	if !found || oldValue != "one" {
+		t.Fatalf("GetSetEX() = %q, %v; want one, true", oldValue, found)
+	}
+	if got, ok := st.Get("session"); !ok || got != "two" {
+		t.Fatalf("Get() = %q, %v; want two, true", got, ok)
+	}
+}
+
 func TestStoreFlushDBAndSize(t *testing.T) {
 	st := New()
 	if err := st.Set("name", "kill"); err != nil {

@@ -96,6 +96,37 @@ redis-cli -p 6379 DECR counter
 # 0
 ```
 
+## CAS
+
+Compares the current value and swaps it atomically when it matches. Returns `1` when swapped and `0` otherwise.
+
+```sh
+redis-cli -p 6379 SET config:v 1
+redis-cli -p 6379 CAS config:v 1 2
+# 1
+
+redis-cli -p 6379 CAS config:v 1 3
+# 0
+```
+
+## SETNXEX
+
+Sets a value with a TTL only when the key does not exist. Returns `1` when set and `0` otherwise.
+
+```sh
+redis-cli -p 6379 SETNXEX lock:job token 30
+# 1
+```
+
+## GETSETEX
+
+Atomically returns the previous value and stores a new value with a TTL.
+
+```sh
+redis-cli -p 6379 GETSETEX session:abc new-token 1800
+# token
+```
+
 ## MSET
 
 Stores multiple key/value pairs.

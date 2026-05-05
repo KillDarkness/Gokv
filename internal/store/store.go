@@ -64,6 +64,81 @@ func (s *Store) MSet(values map[string]string) error {
 	return nil
 }
 
+func (s *Store) CompareAndSet(key string, expected string, value string) (bool, error) {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entry, ok := s.data[key]
+	if !ok {
+		return false, nil
+	}
+	if entryExpired(entry, now) {
+		s.deleteEntryLocked(key)
+		return false, nil
+	}
+	if entry.Type != TypeString {
+		return false, nil
+	}
+	current, ok := entry.Value.(string)
+	if !ok || current != expected {
+		return false, nil
+	}
+
+	s.setEntryLocked(key, s.applyRulesLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now}, now))
+	return true, nil
+}
+
+func (s *Store) SetNXEX(key string, value string, ttl time.Duration) (bool, error) {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entry, ok := s.data[key]
+	if ok && !entryExpired(entry, now) {
+		return false, nil
+	}
+	if ok {
+		s.deleteEntryLocked(key)
+	}
+	if err := s.evictForWriteLocked([]string{key}, now); err != nil {
+		return false, err
+	}
+
+	s.setEntryLocked(key, Entry{Type: TypeString, Value: value, ExpiresAt: now + ttl.Nanoseconds(), LastAccess: now})
+	return true, nil
+}
+
+func (s *Store) GetSetEX(key string, value string, ttl time.Duration) (string, bool, error) {
+	now := time.Now().UnixNano()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entry, ok := s.data[key]
+	if ok && entryExpired(entry, now) {
+		s.deleteEntryLocked(key)
+		ok = false
+	}
+	if !ok {
+		if err := s.evictForWriteLocked([]string{key}, now); err != nil {
+			return "", false, err
+		}
+		s.setEntryLocked(key, Entry{Type: TypeString, Value: value, ExpiresAt: now + ttl.Nanoseconds(), LastAccess: now})
+		return "", false, nil
+	}
+
+	oldValue := ""
+	hadValue := false
+	if entry.Type == TypeString {
+		oldValue, hadValue = entry.Value.(string)
+	}
+	s.setEntryLocked(key, Entry{Type: TypeString, Value: value, ExpiresAt: now + ttl.Nanoseconds(), LastAccess: now})
+	return oldValue, hadValue, nil
+}
+
 func (s *Store) Get(key string) (string, bool) {
 	now := time.Now().UnixNano()
 	if !s.evictionPolicy.TracksAccess() {
