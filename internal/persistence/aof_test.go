@@ -73,7 +73,9 @@ func TestAOFRewriteCompactsCurrentState(t *testing.T) {
 	if err := aof.Append(ctx, []string{"SET", "unused", "value"}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	st.Set("name", "new")
+	if err := st.Set("name", "new"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 
 	if err := aof.Rewrite(ctx, st); err != nil {
 		t.Fatalf("Rewrite() error = %v", err)

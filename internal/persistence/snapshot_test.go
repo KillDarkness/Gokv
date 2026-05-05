@@ -13,7 +13,9 @@ func TestSnapshotSaveAndLoad(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dump.gokv")
 	snapshot := NewSnapshot(true, path)
 	st := store.New()
-	st.Set("name", "kill")
+	if err := st.Set("name", "kill"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 
 	if err := snapshot.Save(ctx, st); err != nil {
 		t.Fatalf("Save() error = %v", err)

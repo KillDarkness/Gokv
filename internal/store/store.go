@@ -7,32 +7,58 @@ import (
 )
 
 type Store struct {
-	mu   sync.RWMutex
-	data map[string]Entry
+	mu             sync.RWMutex
+	data           map[string]Entry
+	maxKeys        int
+	evictionPolicy EvictionPolicy
 }
 
 func New() *Store {
-	return &Store{data: make(map[string]Entry)}
+	return NewWithOptions(Options{EvictionPolicy: NoEviction})
 }
 
-func (s *Store) Set(key string, value string) {
+func NewWithOptions(opts Options) *Store {
+	policy := opts.EvictionPolicy
+	if policy == "" {
+		policy = NoEviction
+	}
+	if !policy.Valid() {
+		policy = NoEviction
+	}
+	return &Store{data: make(map[string]Entry), maxKeys: opts.MaxKeys, evictionPolicy: policy}
+}
+
+func (s *Store) Set(key string, value string) error {
 	now := time.Now().UnixNano()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.evictForWriteLocked([]string{key}, now); err != nil {
+		return err
+	}
 
 	s.data[key] = Entry{Type: TypeString, Value: value, LastAccess: now}
+	return nil
 }
 
-func (s *Store) MSet(values map[string]string) {
+func (s *Store) MSet(values map[string]string) error {
 	now := time.Now().UnixNano()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	if err := s.evictForWriteLocked(keys, now); err != nil {
+		return err
+	}
 
 	for key, value := range values {
 		s.data[key] = Entry{Type: TypeString, Value: value, LastAccess: now}
 	}
+	return nil
 }
 
 func (s *Store) Get(key string) (string, bool) {
@@ -201,6 +227,9 @@ func (s *Store) Increment(key string, delta int64) (int64, error) {
 
 	entry, ok := s.data[key]
 	if !ok || entryExpired(entry, now) {
+		if err := s.evictForWriteLocked([]string{key}, now); err != nil {
+			return 0, err
+		}
 		value := delta
 		s.data[key] = Entry{Type: TypeString, Value: strconv.FormatInt(value, 10), LastAccess: now}
 		return value, nil

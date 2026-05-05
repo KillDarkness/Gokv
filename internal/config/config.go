@@ -15,6 +15,8 @@ type Config struct {
 	AOFFsync     string
 	Snapshot     bool
 	SnapshotPath string
+	MaxKeys      int
+	Eviction     string
 }
 
 func Default() Config {
@@ -27,6 +29,8 @@ func Default() Config {
 		AOFFsync:     "always",
 		Snapshot:     false,
 		SnapshotPath: "data/dump.gokv",
+		MaxKeys:      0,
+		Eviction:     "noeviction",
 	}
 }
 
@@ -65,6 +69,16 @@ func Load() (Config, error) {
 	}
 	if value := os.Getenv("GOKV_SNAPSHOT_PATH"); value != "" {
 		cfg.SnapshotPath = value
+	}
+	if value := os.Getenv("GOKV_MAXKEYS"); value != "" {
+		maxKeys, err := strconv.Atoi(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid GOKV_MAXKEYS: %w", err)
+		}
+		cfg.MaxKeys = maxKeys
+	}
+	if value := os.Getenv("GOKV_EVICTION"); value != "" {
+		cfg.Eviction = value
 	}
 
 	return cfg, nil

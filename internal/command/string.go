@@ -12,7 +12,9 @@ func registerStringCommands(registry *Registry) {
 }
 
 func setCommand(ctx *Context) protocol.Reply {
-	ctx.Store.Set(ctx.Args[1], ctx.Args[2])
+	if err := ctx.Store.Set(ctx.Args[1], ctx.Args[2]); err != nil {
+		return protocol.Error(err.Error())
+	}
 	return protocol.SimpleString("OK")
 }
 
@@ -33,7 +35,9 @@ func msetCommand(ctx *Context) protocol.Reply {
 	for i := 1; i < len(ctx.Args); i += 2 {
 		values[ctx.Args[i]] = ctx.Args[i+1]
 	}
-	ctx.Store.MSet(values)
+	if err := ctx.Store.MSet(values); err != nil {
+		return protocol.Error(err.Error())
+	}
 	return protocol.SimpleString("OK")
 }
 

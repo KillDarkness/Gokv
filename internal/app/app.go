@@ -27,7 +27,7 @@ type App struct {
 
 func New(cfg config.Config) *App {
 	logger := appLog.New()
-	st := store.New()
+	st := store.NewWithOptions(store.Options{MaxKeys: cfg.MaxKeys, EvictionPolicy: store.EvictionPolicy(cfg.Eviction)})
 	metrics := metrics.New()
 	aof, err := persistence.NewAOF(cfg.AppendOnly, cfg.AOFPath, cfg.AOFFsync)
 	if err != nil {

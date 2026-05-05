@@ -5,7 +5,9 @@ import "testing"
 func TestStoreSetGetDeleteExists(t *testing.T) {
 	st := New()
 
-	st.Set("name", "kill")
+	if err := st.Set("name", "kill"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 	if got, ok := st.Get("name"); !ok || got != "kill" {
 		t.Fatalf("Get() = %q, %v; want kill, true", got, ok)
 	}
@@ -30,7 +32,9 @@ func TestStoreExpireAndTTL(t *testing.T) {
 		t.Fatal("TTL() reported metadata for missing key")
 	}
 
-	st.Set("name", "kill")
+	if err := st.Set("name", "kill"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 	if _, exists, hasTTL := st.TTL("name"); !exists || hasTTL {
 		t.Fatalf("TTL() exists = %v, hasTTL = %v; want true, false", exists, hasTTL)
 	}
@@ -60,7 +64,9 @@ func TestStoreIncrement(t *testing.T) {
 		t.Fatalf("Increment() = %d, %v; want 0, nil", got, err)
 	}
 
-	st.Set("bad", "not-number")
+	if err := st.Set("bad", "not-number"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 	if _, err := st.Increment("bad", 1); err == nil {
 		t.Fatal("Increment() error = nil; want error")
 	}
@@ -68,7 +74,9 @@ func TestStoreIncrement(t *testing.T) {
 
 func TestStoreMSetMGet(t *testing.T) {
 	st := New()
-	st.MSet(map[string]string{"name": "kill", "lang": "go"})
+	if err := st.MSet(map[string]string{"name": "kill", "lang": "go"}); err != nil {
+		t.Fatalf("MSet() error = %v", err)
+	}
 
 	got := st.MGet("name", "missing", "lang")
 	if len(got) != 3 {
@@ -87,8 +95,12 @@ func TestStoreMSetMGet(t *testing.T) {
 
 func TestStoreFlushDBAndSize(t *testing.T) {
 	st := New()
-	st.Set("name", "kill")
-	st.Set("lang", "go")
+	if err := st.Set("name", "kill"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if err := st.Set("lang", "go"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 
 	if got := st.Size(); got != 2 {
 		t.Fatalf("Size() = %d; want 2", got)
@@ -101,12 +113,43 @@ func TestStoreFlushDBAndSize(t *testing.T) {
 
 func TestStoreSnapshotAndRestore(t *testing.T) {
 	st := New()
-	st.Set("name", "kill")
+	if err := st.Set("name", "kill"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 
 	restored := New()
 	restored.Restore(st.Snapshot())
 
 	if got, ok := restored.Get("name"); !ok || got != "kill" {
 		t.Fatalf("Get() = %q, %v; want kill, true", got, ok)
+	}
+}
+
+func TestStoreEvictsLRUKey(t *testing.T) {
+	st := NewWithOptions(Options{MaxKeys: 2, EvictionPolicy: AllKeysLRU})
+	if err := st.Set("old", "1"); err != nil {
+		t.Fatalf("Set(old) error = %v", err)
+	}
+	if err := st.Set("new", "2"); err != nil {
+		t.Fatalf("Set(new) error = %v", err)
+	}
+	if err := st.Set("latest", "3"); err != nil {
+		t.Fatalf("Set(latest) error = %v", err)
+	}
+	if _, ok := st.Get("old"); ok {
+		t.Fatal("Get(old) found evicted key")
+	}
+	if got := st.Size(); got != 2 {
+		t.Fatalf("Size() = %d; want 2", got)
+	}
+}
+
+func TestStoreNoEvictionReturnsError(t *testing.T) {
+	st := NewWithOptions(Options{MaxKeys: 1, EvictionPolicy: NoEviction})
+	if err := st.Set("one", "1"); err != nil {
+		t.Fatalf("Set(one) error = %v", err)
+	}
+	if err := st.Set("two", "2"); err == nil {
+		t.Fatal("Set(two) error = nil; want error")
 	}
 }
