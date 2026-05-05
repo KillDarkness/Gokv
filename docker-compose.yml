@@ -1,0 +1,18 @@
+services:
+  gokv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gokv:local
+    container_name: gokv
+    environment:
+      GOKV_APPENDONLY: "true"
+      GOKV_AOF_PATH: /data/appendonly.aof
+    ports:
+      - "6379:6379"
+    volumes:
+      - gokv-data:/data
+    restart: unless-stopped
+
+volumes:
+  gokv-data:

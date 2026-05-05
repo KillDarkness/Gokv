@@ -1,0 +1,16 @@
+.git
+.gitignore
+.dockerignore
+
+bin/
+dist/
+coverage.out
+*.test
+
+appendonly.aof
+dump.gokv
+data/
+
+.DS_Store
+.idea/
+.vscode/
