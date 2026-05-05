@@ -17,6 +17,7 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 	bufferedWriter := bufio.NewWriterSize(writer, 32*1024)
 	defer bufferedWriter.Flush()
 	selectedDB := 0
+	appender := newDatabaseAppender(s.appender)
 
 	for {
 		args, err := parser.ReadCommand()
@@ -40,7 +41,8 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 			continue
 		}
 
-		reply := s.registry.Dispatch(ctx, s.stores[selectedDB], databaseAppender{db: selectedDB, appender: s.appender}, args)
+		appender.Select(selectedDB)
+		reply := s.registry.Dispatch(ctx, s.stores[selectedDB], appender, args)
 		if err := protocol.WriteReply(bufferedWriter, reply); err != nil {
 			return
 		}
@@ -64,10 +66,39 @@ func (s *Server) selectDatabase(args []string, selectedDB *int) protocol.Reply {
 
 type databaseAppender struct {
 	db       int
+	lastDB   int
+	hasDB    bool
 	appender command.Appender
 }
 
-func (a databaseAppender) Append(ctx context.Context, args []string) error {
+func newDatabaseAppender(appender command.Appender) *databaseAppender {
+	return &databaseAppender{appender: appender}
+}
+
+func (a *databaseAppender) Select(db int) {
+	a.db = db
+}
+
+func (a *databaseAppender) Append(ctx context.Context, args []string) error {
+	if a.appender == nil {
+		return nil
+	}
+	if !a.hasDB || a.lastDB != a.db {
+		if err := a.appender.Append(ctx, []string{"SELECT", strconv.Itoa(a.db)}); err != nil {
+			return err
+		}
+		a.lastDB = a.db
+		a.hasDB = true
+	}
+	return a.appender.Append(ctx, args)
+}
+
+type staticDatabaseAppender struct {
+	db       int
+	appender command.Appender
+}
+
+func (a staticDatabaseAppender) Append(ctx context.Context, args []string) error {
 	if a.appender == nil {
 		return nil
 	}
