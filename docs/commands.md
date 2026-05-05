@@ -7,11 +7,11 @@ Supported in the initial implementation:
 - `GET key`
 - `DEL key [key ...]`
 - `EXISTS key [key ...]`
+- `EXPIRE key seconds`
+- `TTL key`
 
 Planned commands:
 
-- `EXPIRE`
-- `TTL`
 - `INCR`
 - `DECR`
 - `MSET`

@@ -4,7 +4,7 @@ Gokv is a lightweight Redis-like in-memory key-value database written in Go.
 
 Redis-compatible enough to be useful. Small enough to understand. Fast enough to be fun.
 
-Current version: `0.2.1`
+Current version: `0.2.2`
 
 ## Goal
 
@@ -59,6 +59,8 @@ Supported fsync policies are `always`, `everysec` and `no`.
 - `GET key`
 - `DEL key [key ...]`
 - `EXISTS key [key ...]`
+- `EXPIRE key seconds`
+- `TTL key`
 
 ## Development
 

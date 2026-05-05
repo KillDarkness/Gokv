@@ -17,8 +17,11 @@ func TestRegistryDispatchStringCommands(t *testing.T) {
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"SET", "name", "kill"}), "+OK\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"GET", "name"}), "$4\r\nkill\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"EXISTS", "name"}), ":1\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"TTL", "name"}), ":-1\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"EXPIRE", "name", "10"}), ":1\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"DEL", "name"}), ":1\r\n")
 	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"GET", "name"}), "$-1\r\n")
+	assertReply(t, registry.Dispatch(context.Background(), st, nil, []string{"TTL", "name"}), ":-2\r\n")
 }
 
 func assertReply(t *testing.T, reply protocol.Reply, want string) {

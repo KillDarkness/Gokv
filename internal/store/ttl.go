@@ -18,6 +18,10 @@ func (s *Store) Expire(key string, ttl time.Duration) bool {
 		}
 		return false
 	}
+	if ttl <= 0 {
+		delete(s.data, key)
+		return true
+	}
 
 	entry.ExpiresAt = now + ttl.Nanoseconds()
 	s.data[key] = entry
