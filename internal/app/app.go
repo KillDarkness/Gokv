@@ -57,6 +57,9 @@ func (a *App) Run(ctx context.Context) error {
 		if err := a.snapshot.Save(context.Background(), a.store); err != nil {
 			a.logger.Printf("snapshot save error: %v", err)
 		}
+		if err := a.aof.Rewrite(context.Background(), a.store); err != nil {
+			a.logger.Printf("aof rewrite error: %v", err)
+		}
 		if err := a.aof.Close(); err != nil {
 			a.logger.Printf("aof close error: %v", err)
 		}

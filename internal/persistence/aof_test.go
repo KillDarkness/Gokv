@@ -57,3 +57,44 @@ func TestNewAOFRejectsInvalidFsyncPolicy(t *testing.T) {
 		t.Fatal("NewAOF() error = nil; want error")
 	}
 }
+
+func TestAOFRewriteCompactsCurrentState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "appendonly.aof")
+	aof, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	ctx := context.Background()
+	st := store.New()
+
+	if err := aof.Append(ctx, []string{"SET", "name", "old"}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	if err := aof.Append(ctx, []string{"SET", "unused", "value"}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	st.Set("name", "new")
+
+	if err := aof.Rewrite(ctx, st); err != nil {
+		t.Fatalf("Rewrite() error = %v", err)
+	}
+
+	registry := command.NewDefaultRegistry()
+	restored := store.New()
+	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	if err := replayAOF.Replay(ctx, func(ctx context.Context, args []string) protocol.Reply {
+		return registry.Dispatch(ctx, restored, nil, args)
+	}); err != nil {
+		t.Fatalf("Replay() error = %v", err)
+	}
+
+	if got, ok := restored.Get("name"); !ok || got != "new" {
+		t.Fatalf("Get(name) = %q, %v; want new, true", got, ok)
+	}
+	if _, ok := restored.Get("unused"); ok {
+		t.Fatal("Get(unused) found key removed by rewrite")
+	}
+}

@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/KillDarkness/gokv/internal/protocol"
+	"github.com/KillDarkness/gokv/internal/store"
 )
 
 type FsyncPolicy string
@@ -102,6 +104,48 @@ func (a *AOF) Sync() error {
 	return a.file.Sync()
 }
 
+func (a *AOF) Rewrite(ctx context.Context, st *store.Store) error {
+	if !a.Enabled {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.file != nil {
+		if err := a.file.Close(); err != nil {
+			return err
+		}
+		a.file = nil
+	}
+	if err := os.MkdirAll(filepath.Dir(a.Path), 0o755); err != nil {
+		return err
+	}
+
+	tmpPath := a.Path + ".rewrite"
+	file, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+
+	writeErr := writeSnapshotAsAOF(file, st.Snapshot())
+	syncErr := file.Sync()
+	closeErr := file.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if syncErr != nil {
+		return syncErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return os.Rename(tmpPath, a.Path)
+}
+
 func (a *AOF) Close() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -136,4 +180,31 @@ func validFsyncPolicy(policy FsyncPolicy) bool {
 	default:
 		return false
 	}
+}
+
+func writeSnapshotAsAOF(file *os.File, snapshot map[string]store.SnapshotEntry) error {
+	now := time.Now().UnixNano()
+	keys := make([]string, 0, len(snapshot))
+	for key := range snapshot {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		entry := snapshot[key]
+		if entry.ExpiresAt > 0 && entry.ExpiresAt <= now {
+			continue
+		}
+		if err := protocol.WriteCommand(file, []string{"SET", key, entry.Value}); err != nil {
+			return err
+		}
+		if entry.ExpiresAt > 0 {
+			remaining := entry.ExpiresAt - now
+			seconds := (remaining + int64(time.Second) - 1) / int64(time.Second)
+			if err := protocol.WriteCommand(file, []string{"EXPIRE", key, fmt.Sprintf("%d", seconds)}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

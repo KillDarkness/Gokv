@@ -4,7 +4,7 @@ Gokv is a lightweight Redis-like in-memory key-value database written in Go.
 
 Redis-compatible enough to be useful. Small enough to understand. Fast enough to be fun.
 
-Current version: `0.2.6`
+Current version: `0.2.7`
 
 ## Goal
 
@@ -51,6 +51,7 @@ GOKV_APPENDONLY=true GOKV_AOF_PATH=data/appendonly.aof GOKV_AOF_FSYNC=everysec g
 
 When AOF is enabled, write commands are appended to `appendonly.aof` and replayed on startup.
 Supported fsync policies are `always`, `everysec` and `no`.
+On shutdown, Gokv rewrites the AOF with the current keyspace to compact old writes.
 
 Snapshot persistence can be enabled with:
 
