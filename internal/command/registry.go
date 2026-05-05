@@ -47,14 +47,15 @@ func (r *Registry) Register(cmd Command) {
 }
 
 func (r *Registry) Dispatch(ctx context.Context, st *store.Store, appender Appender, args []string) protocol.Reply {
-	r.metrics.IncCommands()
 	if len(args) == 0 {
 		r.metrics.IncErrors()
 		return protocol.Error("empty command")
 	}
 
-	name := strings.ToUpper(args[0])
-	cmd, ok := r.commands[name]
+	cmd, ok := r.commands[args[0]]
+	if !ok {
+		cmd, ok = r.commands[strings.ToUpper(args[0])]
+	}
 	if !ok {
 		r.metrics.IncErrors()
 		return protocol.Error(fmt.Sprintf("unknown command '%s'", args[0]))

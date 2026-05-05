@@ -18,6 +18,12 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 	defer bufferedWriter.Flush()
 	selectedDB := 0
 	appender := newDatabaseAppender(s.appender)
+	pendingCommands := uint64(0)
+	defer func() {
+		if pendingCommands > 0 {
+			s.metrics.AddCommands(pendingCommands)
+		}
+	}()
 
 	for {
 		args, err := parser.ReadCommand()
@@ -31,11 +37,28 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 		}
 
 		if strings.EqualFold(args[0], "SELECT") {
+			pendingCommands++
 			reply := s.selectDatabase(args, &selectedDB)
 			if err := protocol.WriteReply(bufferedWriter, reply); err != nil {
 				return
 			}
 			if parser.Buffered() == 0 && bufferedWriter.Buffered() > 0 {
+				s.metrics.AddCommands(pendingCommands)
+				pendingCommands = 0
+				if err := bufferedWriter.Flush(); err != nil {
+					return
+				}
+			}
+			continue
+		}
+		if reply, ok := fastPing(args); ok {
+			pendingCommands++
+			if err := protocol.WriteReply(bufferedWriter, reply); err != nil {
+				return
+			}
+			if parser.Buffered() == 0 && bufferedWriter.Buffered() > 0 {
+				s.metrics.AddCommands(pendingCommands)
+				pendingCommands = 0
 				if err := bufferedWriter.Flush(); err != nil {
 					return
 				}
@@ -45,15 +68,28 @@ func (s *Server) handle(ctx context.Context, reader io.Reader, writer io.Writer)
 
 		appender.Select(selectedDB)
 		reply := s.registry.Dispatch(ctx, s.stores[selectedDB], appender, args)
+		pendingCommands++
 		if err := protocol.WriteReply(bufferedWriter, reply); err != nil {
 			return
 		}
 		if parser.Buffered() == 0 && bufferedWriter.Buffered() > 0 {
+			s.metrics.AddCommands(pendingCommands)
+			pendingCommands = 0
 			if err := bufferedWriter.Flush(); err != nil {
 				return
 			}
 		}
 	}
+}
+
+func fastPing(args []string) (protocol.Reply, bool) {
+	if len(args) == 1 && args[0] == "PING" {
+		return protocol.SimpleString("PONG"), true
+	}
+	if len(args) == 2 && args[0] == "PING" {
+		return protocol.BulkString{Value: args[1]}, true
+	}
+	return nil, false
 }
 
 func (s *Server) selectDatabase(args []string, selectedDB *int) protocol.Reply {

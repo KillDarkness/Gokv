@@ -44,3 +44,14 @@ func BenchmarkRegistryGetParallel(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkRegistryPing(b *testing.B) {
+	registry := NewDefaultRegistry(nil)
+	st := store.New()
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		registry.Dispatch(ctx, st, nil, []string{"PING"})
+	}
+}

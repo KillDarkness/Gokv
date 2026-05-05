@@ -21,6 +21,10 @@ func (m *Metrics) IncCommands() {
 	m.commands.Add(1)
 }
 
+func (m *Metrics) AddCommands(count uint64) {
+	m.commands.Add(count)
+}
+
 func (m *Metrics) IncErrors() {
 	m.errors.Add(1)
 }
