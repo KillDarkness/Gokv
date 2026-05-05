@@ -3,8 +3,23 @@ package protocol
 import (
 	"bufio"
 	"io"
+	"strings"
 	"testing"
 )
+
+func BenchmarkParserReadCommand(b *testing.B) {
+	const command = "*3\r\n$3\r\nSET\r\n$4\r\nname\r\n$4\r\nkill\r\n"
+	input := strings.Repeat(command, b.N)
+	parser := NewParser(strings.NewReader(input))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := parser.ReadCommand(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
 
 func BenchmarkWriteReplyDirect(b *testing.B) {
 	reply := BulkString{Value: "kill"}
