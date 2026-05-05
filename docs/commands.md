@@ -15,3 +15,4 @@ Supported in the initial implementation:
 - `MGET key [key ...]`
 - `FLUSHDB`
 - `INFO`
+- `SELECT index`

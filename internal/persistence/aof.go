@@ -105,6 +105,10 @@ func (a *AOF) Sync() error {
 }
 
 func (a *AOF) Rewrite(ctx context.Context, st *store.Store) error {
+	return a.RewriteDatabases(ctx, []*store.Store{st})
+}
+
+func (a *AOF) RewriteDatabases(ctx context.Context, stores []*store.Store) error {
 	if !a.Enabled {
 		return nil
 	}
@@ -131,7 +135,7 @@ func (a *AOF) Rewrite(ctx context.Context, st *store.Store) error {
 		return err
 	}
 
-	writeErr := writeSnapshotAsAOF(file, st.Snapshot())
+	writeErr := writeDatabasesAsAOF(file, stores)
 	syncErr := file.Sync()
 	closeErr := file.Close()
 	if writeErr != nil {
@@ -183,6 +187,25 @@ func validFsyncPolicy(policy FsyncPolicy) bool {
 }
 
 func writeSnapshotAsAOF(file *os.File, snapshot map[string]store.SnapshotEntry) error {
+	return writeDatabaseSnapshotAsAOF(file, 0, snapshot)
+}
+
+func writeDatabasesAsAOF(file *os.File, stores []*store.Store) error {
+	for db, st := range stores {
+		if err := writeDatabaseSnapshotAsAOF(file, db, st.Snapshot()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeDatabaseSnapshotAsAOF(file *os.File, db int, snapshot map[string]store.SnapshotEntry) error {
+	if len(snapshot) == 0 {
+		return nil
+	}
+	if err := protocol.WriteCommand(file, []string{"SELECT", fmt.Sprintf("%d", db)}); err != nil {
+		return err
+	}
 	now := time.Now().UnixNano()
 	keys := make([]string, 0, len(snapshot))
 	for key := range snapshot {

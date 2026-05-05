@@ -3,6 +3,8 @@ package persistence
 import (
 	"context"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/KillDarkness/gokv/internal/command"
@@ -88,6 +90,9 @@ func TestAOFRewriteCompactsCurrentState(t *testing.T) {
 		t.Fatalf("NewAOF() error = %v", err)
 	}
 	if err := replayAOF.Replay(ctx, func(ctx context.Context, args []string) protocol.Reply {
+		if len(args) == 2 && strings.EqualFold(args[0], "SELECT") {
+			return protocol.SimpleString("OK")
+		}
 		return registry.Dispatch(ctx, restored, nil, args)
 	}); err != nil {
 		t.Fatalf("Replay() error = %v", err)
@@ -98,5 +103,53 @@ func TestAOFRewriteCompactsCurrentState(t *testing.T) {
 	}
 	if _, ok := restored.Get("unused"); ok {
 		t.Fatal("Get(unused) found key removed by rewrite")
+	}
+}
+
+func TestAOFRewritePersistsMultipleDatabases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "appendonly.aof")
+	aof, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	ctx := context.Background()
+	dbs := []*store.Store{store.New(), store.New()}
+	if err := dbs[0].Set("name", "db0"); err != nil {
+		t.Fatalf("Set(db0) error = %v", err)
+	}
+	if err := dbs[1].Set("name", "db1"); err != nil {
+		t.Fatalf("Set(db1) error = %v", err)
+	}
+
+	if err := aof.RewriteDatabases(ctx, dbs); err != nil {
+		t.Fatalf("RewriteDatabases() error = %v", err)
+	}
+
+	registry := command.NewDefaultRegistry(nil)
+	restored := []*store.Store{store.New(), store.New()}
+	selectedDB := 0
+	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	if err := replayAOF.Replay(ctx, func(ctx context.Context, args []string) protocol.Reply {
+		if len(args) == 2 && strings.EqualFold(args[0], "SELECT") {
+			db, err := strconv.Atoi(args[1])
+			if err != nil || db < 0 || db >= len(restored) {
+				return protocol.Error("DB index is out of range")
+			}
+			selectedDB = db
+			return protocol.SimpleString("OK")
+		}
+		return registry.Dispatch(ctx, restored[selectedDB], nil, args)
+	}); err != nil {
+		t.Fatalf("Replay() error = %v", err)
+	}
+
+	if got, ok := restored[0].Get("name"); !ok || got != "db0" {
+		t.Fatalf("db0 Get(name) = %q, %v; want db0, true", got, ok)
+	}
+	if got, ok := restored[1].Get("name"); !ok || got != "db1" {
+		t.Fatalf("db1 Get(name) = %q, %v; want db1, true", got, ok)
 	}
 }

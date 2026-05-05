@@ -47,6 +47,13 @@ func Load() (Config, error) {
 		}
 		cfg.Port = port
 	}
+	if value := os.Getenv("GOKV_DATABASES"); value != "" {
+		databases, err := strconv.Atoi(value)
+		if err != nil || databases < 1 {
+			return Config{}, fmt.Errorf("invalid GOKV_DATABASES: %w", err)
+		}
+		cfg.Databases = databases
+	}
 	if value := os.Getenv("GOKV_APPENDONLY"); value != "" {
 		appendOnly, err := strconv.ParseBool(value)
 		if err != nil {

@@ -15,14 +15,14 @@ import (
 type Server struct {
 	cfg      config.Config
 	registry *command.Registry
-	store    *store.Store
+	stores   []*store.Store
 	appender command.Appender
 	metrics  *metrics.Metrics
 	logger   *appLog.Logger
 }
 
-func New(cfg config.Config, registry *command.Registry, st *store.Store, appender command.Appender, metrics *metrics.Metrics, logger *appLog.Logger) *Server {
-	return &Server{cfg: cfg, registry: registry, store: st, appender: appender, metrics: metrics, logger: logger}
+func New(cfg config.Config, registry *command.Registry, stores []*store.Store, appender command.Appender, metrics *metrics.Metrics, logger *appLog.Logger) *Server {
+	return &Server{cfg: cfg, registry: registry, stores: stores, appender: appender, metrics: metrics, logger: logger}
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
