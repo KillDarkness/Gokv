@@ -14,17 +14,17 @@ func (s *Store) Expire(key string, ttl time.Duration) bool {
 	entry, ok := s.data[key]
 	if !ok || entryExpired(entry, now) {
 		if ok {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 		}
 		return false
 	}
 	if ttl <= 0 {
-		delete(s.data, key)
+		s.deleteEntryLocked(key)
 		return true
 	}
 
 	entry.ExpiresAt = now + ttl.Nanoseconds()
-	s.data[key] = entry
+	s.setEntryLocked(key, entry)
 	return true
 }
 
@@ -39,7 +39,7 @@ func (s *Store) TTL(key string) (time.Duration, bool, bool) {
 		return 0, false, false
 	}
 	if entryExpired(entry, now) {
-		delete(s.data, key)
+		s.deleteEntryLocked(key)
 		return 0, false, false
 	}
 	if entry.ExpiresAt == 0 {
@@ -78,7 +78,7 @@ func (s *Store) DeleteExpired() int64 {
 	var deleted int64
 	for key, entry := range s.data {
 		if entryExpired(entry, now) {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 			deleted++
 		}
 	}

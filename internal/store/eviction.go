@@ -46,26 +46,26 @@ func (s *Store) evictForWriteLocked(keys []string, now int64) error {
 
 		entry, ok := s.data[key]
 		if ok && entryExpired(entry, now) {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 			ok = false
 		}
 		if !ok {
 			needed++
 		}
 	}
-	if needed == 0 || len(s.data)+needed <= s.maxKeys {
+	if needed == 0 || s.keyCount+needed <= s.maxKeys {
 		return nil
 	}
 	if s.evictionPolicy == NoEviction {
 		return ErrMaxKeysReached
 	}
 
-	for len(s.data)+needed > s.maxKeys {
+	for s.keyCount+needed > s.maxKeys {
 		victim, ok := s.evictionCandidateLocked()
 		if !ok {
 			return ErrMaxKeysReached
 		}
-		delete(s.data, victim)
+		s.deleteEntryLocked(victim)
 	}
 	return nil
 }

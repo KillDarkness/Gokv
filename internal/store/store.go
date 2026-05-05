@@ -9,6 +9,7 @@ import (
 type Store struct {
 	mu             sync.RWMutex
 	data           map[string]Entry
+	keyCount       int
 	maxKeys        int
 	evictionPolicy EvictionPolicy
 }
@@ -37,7 +38,7 @@ func (s *Store) Set(key string, value string) error {
 		return err
 	}
 
-	s.data[key] = Entry{Type: TypeString, Value: value, LastAccess: now}
+	s.setEntryLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now})
 	return nil
 }
 
@@ -56,7 +57,7 @@ func (s *Store) MSet(values map[string]string) error {
 	}
 
 	for key, value := range values {
-		s.data[key] = Entry{Type: TypeString, Value: value, LastAccess: now}
+		s.setEntryLocked(key, Entry{Type: TypeString, Value: value, LastAccess: now})
 	}
 	return nil
 }
@@ -72,7 +73,7 @@ func (s *Store) Get(key string) (string, bool) {
 		return "", false
 	}
 	if entryExpired(entry, now) {
-		delete(s.data, key)
+		s.deleteEntryLocked(key)
 		return "", false
 	}
 	if entry.Type != TypeString {
@@ -84,7 +85,7 @@ func (s *Store) Get(key string) (string, bool) {
 		return "", false
 	}
 	entry.LastAccess = now
-	s.data[key] = entry
+	s.setEntryLocked(key, entry)
 
 	return value, true
 }
@@ -103,7 +104,7 @@ func (s *Store) MGet(keys ...string) []StringResult {
 			continue
 		}
 		if entryExpired(entry, now) {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 			results = append(results, StringResult{})
 			continue
 		}
@@ -113,7 +114,7 @@ func (s *Store) MGet(keys ...string) []StringResult {
 			continue
 		}
 		entry.LastAccess = now
-		s.data[key] = entry
+		s.setEntryLocked(key, entry)
 		results = append(results, StringResult{Value: value, OK: true})
 	}
 
@@ -127,7 +128,7 @@ func (s *Store) Delete(keys ...string) int64 {
 	var deleted int64
 	for _, key := range keys {
 		if _, ok := s.data[key]; ok {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 			deleted++
 		}
 	}
@@ -139,23 +140,14 @@ func (s *Store) FlushDB() {
 	defer s.mu.Unlock()
 
 	s.data = make(map[string]Entry)
+	s.keyCount = 0
 }
 
 func (s *Store) Size() int {
-	now := time.Now().UnixNano()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	count := 0
-	for key, entry := range s.data {
-		if entryExpired(entry, now) {
-			delete(s.data, key)
-			continue
-		}
-		count++
-	}
-	return count
+	return s.keyCount
 }
 
 func (s *Store) Snapshot() map[string]SnapshotEntry {
@@ -167,7 +159,7 @@ func (s *Store) Snapshot() map[string]SnapshotEntry {
 	snapshot := make(map[string]SnapshotEntry, len(s.data))
 	for key, entry := range s.data {
 		if entryExpired(entry, now) {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 			continue
 		}
 		if entry.Type != TypeString {
@@ -189,12 +181,13 @@ func (s *Store) Restore(snapshot map[string]SnapshotEntry) {
 	defer s.mu.Unlock()
 
 	s.data = make(map[string]Entry, len(snapshot))
+	s.keyCount = 0
 	for key, entry := range snapshot {
 		storeEntry := Entry{Type: entry.Type, Value: entry.Value, ExpiresAt: entry.ExpiresAt, LastAccess: entry.LastAccess}
 		if entryExpired(storeEntry, now) {
 			continue
 		}
-		s.data[key] = storeEntry
+		s.setEntryLocked(key, storeEntry)
 	}
 }
 
@@ -211,7 +204,7 @@ func (s *Store) Exists(keys ...string) int64 {
 			continue
 		}
 		if entryExpired(entry, now) {
-			delete(s.data, key)
+			s.deleteEntryLocked(key)
 			continue
 		}
 		count++
@@ -231,7 +224,10 @@ func (s *Store) Increment(key string, delta int64) (int64, error) {
 			return 0, err
 		}
 		value := delta
-		s.data[key] = Entry{Type: TypeString, Value: strconv.FormatInt(value, 10), LastAccess: now}
+		if ok {
+			s.deleteEntryLocked(key)
+		}
+		s.setEntryLocked(key, Entry{Type: TypeString, Value: strconv.FormatInt(value, 10), LastAccess: now})
 		return value, nil
 	}
 	if entry.Type != TypeString {
@@ -249,7 +245,24 @@ func (s *Store) Increment(key string, delta int64) (int64, error) {
 	value += delta
 	entry.Value = strconv.FormatInt(value, 10)
 	entry.LastAccess = now
-	s.data[key] = entry
+	s.setEntryLocked(key, entry)
 
 	return value, nil
+}
+
+func (s *Store) setEntryLocked(key string, entry Entry) {
+	if _, ok := s.data[key]; !ok {
+		s.keyCount++
+	}
+	s.data[key] = entry
+}
+
+func (s *Store) deleteEntryLocked(key string) {
+	if _, ok := s.data[key]; !ok {
+		return
+	}
+	delete(s.data, key)
+	if s.keyCount > 0 {
+		s.keyCount--
+	}
 }
