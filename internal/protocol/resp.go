@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"fmt"
 	"io"
+	"strconv"
 )
 
 type Reply interface {
@@ -12,21 +12,35 @@ type Reply interface {
 type SimpleString string
 
 func (r SimpleString) WriteRESP(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "+%s\r\n", string(r))
+	if _, err := io.WriteString(w, "+"); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(r)); err != nil {
+		return err
+	}
+	_, err := io.WriteString(w, "\r\n")
 	return err
 }
 
 type Error string
 
 func (r Error) WriteRESP(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "-ERR %s\r\n", string(r))
+	if _, err := io.WriteString(w, "-ERR "); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(r)); err != nil {
+		return err
+	}
+	_, err := io.WriteString(w, "\r\n")
 	return err
 }
 
 type Integer int64
 
 func (r Integer) WriteRESP(w io.Writer) error {
-	_, err := fmt.Fprintf(w, ":%d\r\n", int64(r))
+	buf := strconv.AppendInt([]byte{':'}, int64(r), 10)
+	buf = append(buf, '\r', '\n')
+	_, err := w.Write(buf)
 	return err
 }
 
@@ -35,7 +49,15 @@ type BulkString struct {
 }
 
 func (r BulkString) WriteRESP(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "$%d\r\n%s\r\n", len([]byte(r.Value)), r.Value)
+	buf := strconv.AppendInt([]byte{'$'}, int64(len(r.Value)), 10)
+	buf = append(buf, '\r', '\n')
+	if _, err := w.Write(buf); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, r.Value); err != nil {
+		return err
+	}
+	_, err := io.WriteString(w, "\r\n")
 	return err
 }
 
@@ -49,7 +71,9 @@ func (r NullBulkString) WriteRESP(w io.Writer) error {
 type Array []Reply
 
 func (r Array) WriteRESP(w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "*%d\r\n", len(r)); err != nil {
+	buf := strconv.AppendInt([]byte{'*'}, int64(len(r)), 10)
+	buf = append(buf, '\r', '\n')
+	if _, err := w.Write(buf); err != nil {
 		return err
 	}
 	for _, item := range r {
