@@ -4,6 +4,8 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/KillDarkness/gokv/internal/protocol"
 )
 
 type recordingAppender struct {
@@ -42,5 +44,15 @@ func TestDatabaseAppenderSkipsDuplicateSelect(t *testing.T) {
 	}
 	if !reflect.DeepEqual(recorder.commands, want) {
 		t.Fatalf("commands = %#v; want %#v", recorder.commands, want)
+	}
+}
+
+func TestFastPing(t *testing.T) {
+	reply, ok := fastPing([]string{"PING"})
+	if !ok {
+		t.Fatal("fastPing() ok = false; want true")
+	}
+	if _, ok := reply.(protocol.SimpleString); !ok {
+		t.Fatalf("fastPing() reply = %T; want protocol.SimpleString", reply)
 	}
 }
