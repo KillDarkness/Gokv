@@ -1,0 +1,17 @@
+# Binaries
+/bin/
+/dist/
+/gokv
+
+# Go
+coverage.out
+*.test
+
+# Runtime data
+appendonly.aof
+dump.gokv
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
