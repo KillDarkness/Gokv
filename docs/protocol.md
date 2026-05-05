@@ -1,6 +1,6 @@
 # Protocol
 
-Gokv uses a small RESP subset compatible with basic `redis-cli` commands.
+Gokv uses a small RESP subset compatible with supported `redis-cli` commands.
 
 Example request:
 
@@ -22,3 +22,21 @@ Implemented reply types:
 - Bulk strings
 - Null bulk strings
 - Arrays
+
+## Command Format
+
+Commands are expected as RESP arrays of bulk strings:
+
+```text
+*3\r\n$3\r\nSET\r\n$4\r\nname\r\n$4\r\nkill\r\n
+```
+
+Inline commands are also accepted for simple manual tests:
+
+```text
+PING\r\n
+```
+
+## Compatibility Scope
+
+Gokv is not a full Redis server. It is compatible with Redis clients only for commands and RESP types implemented by this project.

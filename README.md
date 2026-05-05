@@ -92,6 +92,19 @@ make test
 make build
 ```
 
+## Documentation
+
+Full documentation is available in [`docs/`](docs/README.md):
+
+- [Usage](docs/usage.md)
+- [Configuration](docs/configuration.md)
+- [Commands](docs/commands.md)
+- [Persistence](docs/persistence.md)
+- [Protocol](docs/protocol.md)
+- [Architecture](docs/architecture.md)
+- [Project Standards](docs/project-standards.md)
+- [Best Practices](docs/best-practices.md)
+
 ## Roadmap
 
 v0.1:
