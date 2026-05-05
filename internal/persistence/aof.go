@@ -27,6 +27,9 @@ type AOF struct {
 	FsyncPolicy FsyncPolicy
 	mu          sync.Mutex
 	file        *os.File
+	queue       chan []string
+	async       bool
+	lastErr     error
 }
 
 func NewAOF(enabled bool, path string, fsync string) (*AOF, error) {
@@ -50,21 +53,71 @@ func (a *AOF) Append(ctx context.Context, args []string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	args = append([]string(nil), args...)
+
+	a.mu.Lock()
+	queue := a.queue
+	async := a.async
+	lastErr := a.lastErr
+	a.mu.Unlock()
+	if lastErr != nil {
+		return lastErr
+	}
+	if async {
+		select {
+		case queue <- args:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	file, err := a.openAppendFile()
-	if err != nil {
-		return err
-	}
-	if err := protocol.WriteCommand(file, args); err != nil {
+	if err := a.writeCommandLocked(args); err != nil {
 		return err
 	}
 	if a.FsyncPolicy == FsyncAlways {
-		return file.Sync()
+		return a.file.Sync()
 	}
 	return nil
+}
+
+func (a *AOF) StartWriter(ctx context.Context, bufferSize int) <-chan struct{} {
+	done := make(chan struct{})
+
+	if !a.Enabled || a.FsyncPolicy == FsyncAlways {
+		close(done)
+		return done
+	}
+	if bufferSize <= 0 {
+		bufferSize = 4096
+	}
+
+	a.mu.Lock()
+	if a.queue == nil {
+		a.queue = make(chan []string, bufferSize)
+		a.async = true
+	}
+	queue := a.queue
+	a.mu.Unlock()
+
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case args := <-queue:
+				a.writeAsync(args)
+			case <-ctx.Done():
+				a.drainAsync(queue)
+				_ = a.Sync()
+				return
+			}
+		}
+	}()
+
+	return done
 }
 
 func (a *AOF) StartSyncer(ctx context.Context, interval time.Duration) <-chan struct{} {
@@ -160,6 +213,37 @@ func (a *AOF) Close() error {
 	err := a.file.Close()
 	a.file = nil
 	return err
+}
+
+func (a *AOF) writeAsync(args []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.lastErr != nil {
+		return
+	}
+	if err := a.writeCommandLocked(args); err != nil {
+		a.lastErr = err
+	}
+}
+
+func (a *AOF) drainAsync(queue chan []string) {
+	for {
+		select {
+		case args := <-queue:
+			a.writeAsync(args)
+		default:
+			return
+		}
+	}
+}
+
+func (a *AOF) writeCommandLocked(args []string) error {
+	file, err := a.openAppendFile()
+	if err != nil {
+		return err
+	}
+	return protocol.WriteCommand(file, args)
 }
 
 func (a *AOF) openAppendFile() (*os.File, error) {

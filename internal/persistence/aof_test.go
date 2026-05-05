@@ -153,3 +153,39 @@ func TestAOFRewritePersistsMultipleDatabases(t *testing.T) {
 		t.Fatalf("db1 Get(name) = %q, %v; want db1, true", got, ok)
 	}
 }
+
+func TestAOFAsyncWriterDrainsOnCancel(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "appendonly.aof")
+	aof, err := NewAOF(true, path, string(FsyncEverySec))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := aof.StartWriter(ctx, 16)
+
+	for i := range 32 {
+		if err := aof.Append(ctx, []string{"SET", "key", strconv.Itoa(i)}); err != nil {
+			t.Fatalf("Append() error = %v", err)
+		}
+	}
+	cancel()
+	<-done
+	if err := aof.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	registry := command.NewDefaultRegistry(nil)
+	restored := store.New()
+	replayAOF, err := NewAOF(true, path, string(FsyncAlways))
+	if err != nil {
+		t.Fatalf("NewAOF() error = %v", err)
+	}
+	if err := replayAOF.Replay(context.Background(), func(ctx context.Context, args []string) protocol.Reply {
+		return registry.Dispatch(ctx, restored, nil, args)
+	}); err != nil {
+		t.Fatalf("Replay() error = %v", err)
+	}
+	if got, ok := restored.Get("key"); !ok || got != "31" {
+		t.Fatalf("Get(key) = %q, %v; want 31, true", got, ok)
+	}
+}

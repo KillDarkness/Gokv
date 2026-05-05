@@ -58,10 +58,12 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel()
 
 	janitorDone := startJanitors(runCtx, a.stores, time.Minute)
+	aofWriterDone := a.aof.StartWriter(runCtx, 4096)
 	aofSyncerDone := a.aof.StartSyncer(runCtx, time.Second)
 	defer func() {
 		cancel()
 		<-janitorDone
+		<-aofWriterDone
 		<-aofSyncerDone
 		if err := a.snapshot.Save(context.Background(), a.stores[0]); err != nil {
 			a.logger.Printf("snapshot save error: %v", err)
